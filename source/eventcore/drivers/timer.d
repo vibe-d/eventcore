@@ -82,7 +82,19 @@ final class LoopTimeoutTimerDriver : EventDriverTimers {
 	@trusted {
 		auto id = cast(TimerID)(++m_lastTimerID);
 		TimerSlot* tm;
+		
+		
 		try tm = ms_allocator.make!TimerSlot;
+		/*
+		this is bad. MAllocator create an malloc C memory but TimerSlot holds delegate
+		so if collect is called DG's pointer to context is freed due to no GC.addRange for allocated memory...
+		
+		don't use Mallocator or add range to GC.
+		*/
+		
+		
+		
+		
 		catch (Exception e) return TimerID.invalid;
 		GC.addRange(tm, TimerSlot.sizeof, typeid(TimerSlot));
 		assert(tm !is null);
