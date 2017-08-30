@@ -91,7 +91,7 @@ final class EpollEventLoop : PosixEventLoop {
 
 		if (ret > 0) {
 			processed_any = true;
-			foreach (i, ref evt; m_events[0 .. ret]) {
+			foreach (ref evt; m_events[0 .. ret]) {
 				debug (EventCoreEpollDebug) print("Epoll event on %s: %s", evt.data.fd, evt.events);
 				UnfinishedRecord ur;
 				auto fd = cast(FD)evt.data.fd;
