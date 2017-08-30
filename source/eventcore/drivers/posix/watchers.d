@@ -70,9 +70,10 @@ final class InotifyEventDriverWatchers(Loop : PosixEventLoop) : EventDriverWatch
 		return true;
 	}
 
-	private void onChanges(FD fd)
+	private bool onChanges(FD fd)
 	{
 		processEvents(cast(WatcherID)fd);
+		return false;
 	}
 
 	private void processEvents(WatcherID id)
