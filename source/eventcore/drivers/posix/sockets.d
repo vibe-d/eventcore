@@ -180,7 +180,7 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 
 	private void onAccept(FD listenfd)
 	{
-		foreach (i; 0 .. 20) {
+		while (true) {
 			sock_t sockfd;
 			sockaddr_storage addr;
 			socklen_t addr_len = addr.sizeof;
@@ -802,4 +802,3 @@ private int getSocketError()
 	version (Windows) return WSAGetLastError();
 	else return errno;
 }
-
