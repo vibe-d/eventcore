@@ -57,7 +57,7 @@ final class EpollEventLoop : PosixEventLoop {
 
 	override bool doProcessEvents(Duration timeout)
 	@trusted {
-		import std.algorithm : min, max, remove, SwapStrategy;
+		import std.algorithm : min, max, remove, canFind, SwapStrategy;
 		//assert(Fiber.getThis() is null, "processEvents may not be called from within a fiber!");
 
 		debug (EventCoreEpollDebug) print("Epoll wait %s, %s", m_events.length, timeout);
@@ -102,8 +102,10 @@ final class EpollEventLoop : PosixEventLoop {
 				if (evt.events & EPOLLOUT)
 					ur.write_unfinished = notify!(EventType.write)(fd);
 				if (!ur.all_finished) {
-					ur.fd = fd;
-					unfinished_events ~= ur;
+					if (!unfinished_events.canFind!(a => a.fd == fd)()) {
+						ur.fd = fd;
+						unfinished_events ~= ur;
+					}
 				}
 			}
 		}
