@@ -66,7 +66,6 @@ final class EpollEventLoop : PosixEventLoop {
 	{
 		debug (EventCoreEpollDebug) print("Epoll register FD %s: %s", fd, mask);
 		epoll_event ev;
-		ev.events |= EPOLLET;
 		if (mask & EventMask.read) ev.events |= EPOLLIN;
 		if (mask & EventMask.write) ev.events |= EPOLLOUT;
 		if (mask & EventMask.status) ev.events |= EPOLLERR|EPOLLHUP|EPOLLRDHUP;
@@ -84,7 +83,6 @@ final class EpollEventLoop : PosixEventLoop {
 	{
 		debug (EventCoreEpollDebug) print("Epoll update FD %s: %s", fd, mask);
 		epoll_event ev;
-		ev.events |= EPOLLET;
 		//ev.events = EPOLLONESHOT;
 		if (mask & EventMask.read) ev.events |= EPOLLIN;
 		if (mask & EventMask.write) ev.events |= EPOLLOUT;
