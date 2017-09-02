@@ -221,11 +221,12 @@ package class PosixEventLoop {
 	/// Updates the event mask to use for listening for notifications.
 	protected abstract void updateFD(FD fd, EventMask old_mask, EventMask new_mask, bool edge_triggered = true);
 
-	final protected void notify(EventType evt)(FD fd)
+	final protected bool notify(EventType evt)(FD fd)
 	{
 		//assert(m_fds[fd].callback[evt] !is null, "Notifying FD which is not listening for event.");
 		if (m_fds[fd.value].common.callback[evt])
-			m_fds[fd.value].common.callback[evt](fd);
+			return m_fds[fd.value].common.callback[evt](fd);
+		return false;
 	}
 
 	final protected void enumerateFDs(EventType evt)(scope FDEnumerateCallback del)
@@ -276,7 +277,7 @@ package class PosixEventLoop {
 
 alias FDEnumerateCallback = void delegate(FD);
 
-alias FDSlotCallback = void delegate(FD);
+alias FDSlotCallback = bool delegate(FD);
 
 private struct FDSlot {
 	FDSlotCallback[EventType.max+1] callback;

@@ -105,7 +105,7 @@ final class PosixEventDriverEvents(Loop : PosixEventLoop, Sockets : EventDriverS
 		getSlot(event).waiters.removePending(on_event);
 	}
 
-	private void onEvent(FD fd)
+	private bool onEvent(FD fd)
 	@trusted {
 		EventID event = cast(EventID)fd;
 		version (linux) {
@@ -115,6 +115,7 @@ final class PosixEventDriverEvents(Loop : PosixEventLoop, Sockets : EventDriverS
 		import core.atomic : cas;
 		auto all = cas(&getSlot(event).triggerAll, true, false);
 		trigger(event, all);
+		return false;
 	}
 
 	version (linux) {}

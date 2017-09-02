@@ -104,7 +104,7 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 		return fd;
 	}
 
-	private void onConnect(FD sock)
+	private bool onConnect(FD sock)
 	{
 		m_loop.setNotifyCallback!(EventType.write)(sock, null);
 		with (m_loop.m_fds[sock].streamSocket) {
@@ -113,9 +113,10 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 			connectCallback = null;
 			if (cb) cb(cast(StreamSocketFD)sock, ConnectStatus.connected);
 		}
+		return false;
 	}
 
-	private void onConnectError(FD sock)
+	private bool onConnectError(FD sock)
 	{
 		// FIXME: determine the correct kind of error!
 		with (m_loop.m_fds[sock].streamSocket) {
@@ -124,6 +125,7 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 			connectCallback = null;
 			if (cb) cb(cast(StreamSocketFD)sock, ConnectStatus.refused);
 		}
+		return false;
 	}
 
 	alias listenStream = EventDriverSockets.listenStream;
@@ -174,18 +176,23 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 	{
 		m_loop.registerFD(sock, EventMask.read, false);
 		m_loop.m_fds[sock].streamListen.acceptCallback = on_accept;
-		m_loop.setNotifyCallback!(EventType.read)(sock, &onAccept);
-		onAccept(sock);
+		m_loop.setNotifyCallback!(EventType.read)(sock, &onAccept!true);
+		onAccept!(false)(sock);
 	}
 
-	private void onAccept(FD listenfd)
+	// returns true when there mey be unaccepted connections left
+	private bool onAccept(bool limit_accepts = true)(FD listenfd)
 	{
-		foreach (i; 0 .. 20) {
+		static if (limit_accepts)
+			int con_accepted = 0;
+
+		while (true) {
 			sock_t sockfd;
 			sockaddr_storage addr;
 			socklen_t addr_len = addr.sizeof;
 			() @trusted { sockfd = accept(cast(sock_t)listenfd, () @trusted { return cast(sockaddr*)&addr; } (), &addr_len); } ();
-			if (sockfd == -1) break;
+			if (sockfd == -1)
+				return false;
 
 			setSocketNonBlocking(cast(SocketFD)sockfd);
 			auto fd = cast(StreamSocketFD)sockfd;
@@ -198,6 +205,12 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 			//print("accept %d", sockfd);
 			scope RefAddress addrc = new RefAddress(() @trusted { return cast(sockaddr*)&addr; } (), addr_len);
 			m_loop.m_fds[listenfd].streamListen.acceptCallback(cast(StreamListenSocketFD)listenfd, fd, addrc);
+
+			static if (limit_accepts)
+			{
+				if (++con_accepted >= 64)
+					return true;
+			}
 		}
 	}
 
@@ -296,7 +309,7 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 		}
 	}
 
-	private void onSocketRead(FD fd)
+	private bool onSocketRead(FD fd)
 	{
 		auto slot = () @trusted { return &m_loop.m_fds[fd].streamSocket(); } ();
 		auto socket = cast(StreamSocketFD)fd;
@@ -314,14 +327,14 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 			auto err = getSocketError();
 			if (!err.among!(EAGAIN, EINPROGRESS)) {
 				finalize(IOStatus.error);
-				return;
+				return false;
 			}
 		}
 
 		if (ret == 0 && slot.readBuffer.length) {
 			slot.state = ConnectionState.passiveClose;
 			finalize(IOStatus.disconnected);
-			return;
+			return false;
 		}
 
 		if (ret > 0 || !slot.readBuffer.length) {
@@ -329,9 +342,10 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 			slot.readBuffer = slot.readBuffer[ret .. $];
 			if (slot.readMode != IOMode.all || slot.readBuffer.length == 0) {
 				finalize(IOStatus.ok);
-				return;
+				return false;
 			}
 		}
+		return false;
 	}
 
 	final override void write(StreamSocketFD socket, const(ubyte)[] buffer, IOMode mode, IOCallback on_write_finish)
@@ -389,7 +403,7 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 		m_loop.m_fds[socket].streamSocket.writeBuffer = null;
 	}
 
-	private void onSocketWrite(FD fd)
+	private bool onSocketWrite(FD fd)
 	{
 		auto slot = () @trusted { return &m_loop.m_fds[fd].streamSocket(); } ();
 		auto socket = cast(StreamSocketFD)fd;
@@ -402,7 +416,7 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 			if (!err.among!(EAGAIN, EINPROGRESS)) {
 				m_loop.setNotifyCallback!(EventType.write)(socket, null);
 				slot.writeCallback(socket, IOStatus.error, slot.bytesRead);
-				return;
+				return false;
 			}
 		}
 
@@ -412,9 +426,10 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 			if (slot.writeMode != IOMode.all || slot.writeBuffer.length == 0) {
 				m_loop.setNotifyCallback!(EventType.write)(socket, null);
 				slot.writeCallback(cast(StreamSocketFD)socket, IOStatus.ok, slot.bytesWritten);
-				return;
+				return false;
 			}
 		}
+		return false;
 	}
 
 	final override void waitForData(StreamSocketFD socket, IOCallback on_data_available)
@@ -453,7 +468,7 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 		m_loop.setNotifyCallback!(EventType.read)(socket, &onSocketDataAvailable);
 	}
 
-	private void onSocketDataAvailable(FD fd)
+	private bool onSocketDataAvailable(FD fd)
 	{
 		auto slot = () @trusted { return &m_loop.m_fds[fd].streamSocket(); } ();
 		auto socket = cast(StreamSocketFD)fd;
@@ -472,6 +487,8 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 			auto err = getSocketError();
 			if (!err.among!(EAGAIN, EINPROGRESS)) finalize(IOStatus.error);
 		} else finalize(ret ? IOStatus.ok : IOStatus.disconnected);
+
+		return false;
 	}
 
 	final override void shutdown(StreamSocketFD socket, bool shut_read, bool shut_write)
@@ -595,7 +612,7 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 		m_loop.m_fds[socket].datagramSocket.readBuffer = null;
 	}
 
-	private void onDgramRead(FD fd)
+	private bool onDgramRead(FD fd)
 	@trusted { // DMD 2.072.0-b2: scope considered unsafe
 		auto slot = () @trusted { return &m_loop.m_fds[fd].datagramSocket(); } ();
 		auto socket = cast(DatagramSocketFD)fd;
@@ -610,13 +627,14 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 			if (!err.among!(EAGAIN, EINPROGRESS)) {
 				m_loop.setNotifyCallback!(EventType.read)(socket, null);
 				slot.readCallback(socket, IOStatus.error, 0, null);
-				return;
+				return false;
 			}
 		}
 
 		m_loop.setNotifyCallback!(EventType.read)(socket, null);
 		scope src_addrc = new RefAddress(() @trusted { return cast(sockaddr*)&src_addr; } (), src_addr.sizeof);
 		() @trusted { return cast(DatagramIOCallback)slot.readCallback; } ()(socket, IOStatus.ok, ret, src_addrc);
+		return false;
 	}
 
 	void send(DatagramSocketFD socket, const(ubyte)[] buffer, IOMode mode, Address target_address, DatagramIOCallback on_send_finish)
@@ -664,7 +682,7 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 		m_loop.m_fds[socket].datagramSocket.writeBuffer = null;
 	}
 
-	private void onDgramWrite(FD fd)
+	private bool onDgramWrite(FD fd)
 	{
 		auto slot = () @trusted { return &m_loop.m_fds[fd].datagramSocket(); } ();
 		auto socket = cast(DatagramSocketFD)fd;
@@ -681,12 +699,14 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 			if (!err.among!(EAGAIN, EINPROGRESS)) {
 				m_loop.setNotifyCallback!(EventType.write)(socket, null);
 				() @trusted { return cast(DatagramIOCallback)slot.writeCallback; } ()(socket, IOStatus.error, 0, null);
-				return;
+				return false;
 			}
 		}
 
 		m_loop.setNotifyCallback!(EventType.write)(socket, null);
 		() @trusted { return cast(DatagramIOCallback)slot.writeCallback; } ()(socket, IOStatus.ok, ret, null);
+
+		return false;
 	}
 
 	final override void addRef(SocketFD fd)
@@ -802,4 +822,3 @@ private int getSocketError()
 	version (Windows) return WSAGetLastError();
 	else return errno;
 }
-
