@@ -20,6 +20,15 @@ version (Posix) {
 
 	version (linux) enum SO_REUSEPORT = 15;
 	else enum SO_REUSEPORT = 0x200;
+
+	static if (!is(typeof(O_CLOEXEC)))
+	{
+		version (linux) enum O_CLOEXEC = 0x80000;
+		else version (FreeBSD) enum O_CLOEXEC = 0x100000;
+		else version (NetBSD) enum O_CLOEXEC = 0x400000;
+		else version (OpenBSD) enum O_CLOEXEC = 0x10000;
+		else version (OSX) enum O_CLOEXEC = 0x1000000;
+	}
 }
 version (linux) {
 	extern (C) int accept4(int sockfd, sockaddr *addr, socklen_t *addrlen, int flags) nothrow @nogc;
