@@ -22,17 +22,17 @@ void main()
 	// first timer: one-shot 200ms
 	auto tm = eventDriver.timers.create();
 	eventDriver.timers.wait(tm, (tm) nothrow @safe {
-		Duration dur;
-		{
-			scope (failure) assert(false);
+		try {
 			writefln("First timer");
-			dur = Clock.currTime(UTC()) - s_startTime;
+			auto dur = Clock.currTime(UTC()) - s_startTime;
+
+			assert(dur >= 200.msecs, (dur - 200.msecs).toString());
+			assert(dur < 250.msecs, (dur - 200.msecs).toString());
+
+			timer1fired = true;
+		} catch (Exception e) {
+			assert(false, e.msg);
 		}
-
-		assert(dur >= 200.msecs);
-		assert(dur < 250.msecs);
-
-		timer1fired = true;
 	});
 	eventDriver.timers.set(tm, 200.msecs, 0.msecs);
 
@@ -45,8 +45,8 @@ void main()
 
 			auto dur = Clock.currTime(UTC()) - s_startTime;
 			s_cnt++;
-			assert(dur > 100.msecs * s_cnt);
-			assert(dur < 100.msecs * s_cnt + 60.msecs);
+			assert(dur > 100.msecs * s_cnt, (dur - 100.msecs * s_cnt).toString());
+			assert(dur < 100.msecs * s_cnt + 60.msecs, (dur - 100.msecs * s_cnt).toString());
 			assert(s_cnt <= 3);
 
 			if (s_cnt == 3) {
