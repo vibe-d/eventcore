@@ -26,8 +26,10 @@ void main()
 			dur = Clock.currTime(UTC()) - s_startTime;
 		}
 
-		assert(dur > 200.msecs);
-		assert(dur < 260.msecs);
+		try {
+			assert(dur > 200.msecs, (dur - 200.msecs).toString());
+			assert(dur < 260.msecs, (dur - 200.msecs).toString());
+		} catch (Exception e) assert(false, e.msg);
 
 		s_startTime += dur;
 
@@ -37,8 +39,8 @@ void main()
 			try {
 				auto dur = Clock.currTime(UTC()) - s_startTime;
 				s_cnt++;
-				assert(dur > 100.msecs * s_cnt);
-				assert(dur < 100.msecs * s_cnt + 60.msecs);
+				assert(dur > 100.msecs * s_cnt, (dur - 100.msecs * s_cnt).toString());
+				assert(dur < 100.msecs * s_cnt + 60.msecs, (dur - 100.msecs * s_cnt).toString());
 				assert(s_cnt <= 3);
 
 				if (s_cnt == 3) {
