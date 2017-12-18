@@ -20,11 +20,22 @@ version (Posix) {
 
 	version (linux) enum SO_REUSEPORT = 15;
 	else enum SO_REUSEPORT = 0x200;
+
+	static if (!is(typeof(O_CLOEXEC)))
+	{
+		version (linux) enum O_CLOEXEC = 0x80000;
+		else version (FreeBSD) enum O_CLOEXEC = 0x100000;
+		else version (NetBSD) enum O_CLOEXEC = 0x400000;
+		else version (OpenBSD) enum O_CLOEXEC = 0x10000;
+		else version (OSX) enum O_CLOEXEC = 0x1000000;
+	}
 }
 version (linux) {
 	extern (C) int accept4(int sockfd, sockaddr *addr, socklen_t *addrlen, int flags) nothrow @nogc;
 	static if (!is(typeof(SOCK_NONBLOCK)))
 		enum SOCK_NONBLOCK = 0x800;
+	static if (!is(typeof(SOCK_CLOEXEC)))
+		enum SOCK_CLOEXEC = 0x80000;
 
 	static if (__VERSION__ < 2077)
 	{
@@ -230,12 +241,13 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 		sockaddr_storage addr;
 		socklen_t addr_len = addr.sizeof;
 		version (linux) {
-			() @trusted { sockfd = accept4(cast(sock_t)listenfd, () @trusted { return cast(sockaddr*)&addr; } (), &addr_len, SOCK_NONBLOCK); } ();
+			() @trusted { sockfd = accept4(cast(sock_t)listenfd, () @trusted { return cast(sockaddr*)&addr; } (), &addr_len, SOCK_NONBLOCK | SOCK_CLOEXEC); } ();
 			if (sockfd == -1) return;
 		} else {
 			() @trusted { sockfd = accept(cast(sock_t)listenfd, () @trusted { return cast(sockaddr*)&addr; } (), &addr_len); } ();
 			if (sockfd == -1) return;
 			setSocketNonBlocking(cast(SocketFD)sockfd);
+			setSocketCloseOnExec(cast(SocketFD)sockfd);
 		}
 		auto fd = cast(StreamSocketFD)sockfd;
 		m_loop.initFD(fd, FDFlags.none);
@@ -924,6 +936,13 @@ private void setSocketNonBlocking(SocketFD sockfd)
 		() @trusted { ioctlsocket(sockfd, FIONBIO, &enable); } ();
 	} else {
 		() @trusted { fcntl(cast(int)sockfd, F_SETFL, O_NONBLOCK, 1); } ();
+	}
+}
+
+private void setSocketCloseOnExec(SocketFD sockfd)
+@nogc nothrow {
+	version (Windows) {} else {
+		() @trusted { fcntl(cast(int)sockfd, F_SETFL, O_CLOEXEC, 1); } ();
 	}
 }
 
