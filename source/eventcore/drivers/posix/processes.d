@@ -229,6 +229,8 @@ final class SignalEventDriverProcesses(Loop : PosixEventLoop) : EventDriverProce
 
     private void onProcessExit(int system_pid, int exitCode)
     {
+        import core.sys.posix.sys.wait : waitpid;
+
         auto pid = cast(ProcessID)system_pid;
         auto info = () @trusted { return pid in m_processes; } ();
 
@@ -237,6 +239,9 @@ final class SignalEventDriverProcesses(Loop : PosixEventLoop) : EventDriverProce
         if (info is null) {
             return;
         }
+
+        // call wait to avoid zombie process (returns immediatelly now)
+        (pid) @trusted { waitpid(pid, null, 0); }(system_pid);
 
         info.exited = true;
         info.exitCode = exitCode;
