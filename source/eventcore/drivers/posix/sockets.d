@@ -463,8 +463,14 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 			return;
 		}
 
+		version (Posix) {
+			int flags = MSG_NOSIGNAL;
+		} else {
+			int flags = 0;
+		}
+
 		sizediff_t ret;
-		() @trusted { ret = .send(cast(sock_t)socket, buffer.ptr, min(buffer.length, int.max), MSG_NOSIGNAL); } ();
+		() @trusted { ret = .send(cast(sock_t)socket, buffer.ptr, min(buffer.length, int.max), flags); } ();
 
 		if (ret < 0) {
 			auto err = getSocketError();
