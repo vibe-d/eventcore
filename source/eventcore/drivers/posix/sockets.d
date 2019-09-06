@@ -463,7 +463,9 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 			return;
 		}
 
-		version (Posix) {
+		version (OSX) {
+			int flags = SO_NOSIGPIPE;
+		} else version (Posix) {
 			int flags = MSG_NOSIGNAL;
 		} else {
 			int flags = 0;
