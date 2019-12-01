@@ -38,7 +38,7 @@ final class EpollEventLoop : PosixEventLoop {
 
 	override bool doProcessEvents(Duration timeout)
 	@trusted {
-		import std.algorithm : min, max;
+		import std.algorithm : max;
 		//assert(Fiber.getThis() is null, "processEvents may not be called from within a fiber!");
 
 		debug (EventCoreEpollDebug) print("Epoll wait %s, %s", m_events.length, timeout);
