@@ -51,7 +51,9 @@ configuration "select-optlink" {
 }
 
 configuration "libasync" {
-	dependency "libasync" version="~>0.8.2"
+	// currently produces a conflict with botan <1.12.7 and botan 1.12.7
+	// produces a conflict with vibe-d:tls (openssl)
+	dependency "libasync" version=">=0.8.2 <0.8.5"
 	versions "EventcoreLibasyncDriver"
 }
 
