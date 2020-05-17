@@ -685,6 +685,19 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 		} else finalize(ret ? IOStatus.ok : IOStatus.disconnected);
 	}
 
+	final override void waitUntilReady(StreamSocketFD socket, IOReadiness event_mask, IOReadinessCallback on_ready)
+	{
+		if (!isValid(socket)) {
+			on_data_available(socket, IOReadiness.none);
+			return;
+		}
+
+		if (event_mask & IOReadiness.read)
+			m_loop.setNotifyCallback!(EventType.read)(socket, &onSocketDataAvailable);
+	}
+
+	final override
+
 	final override void shutdown(StreamSocketFD socket, bool shut_read, bool shut_write)
 	{
 		if (!isValid(socket)) return;

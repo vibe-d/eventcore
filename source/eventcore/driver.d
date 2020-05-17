@@ -304,6 +304,17 @@ interface EventDriverSockets {
 	*/
 	void waitForData(StreamSocketFD socket, IOCallback on_data_available);
 
+	/** Waits until the given IO readiness changes.
+
+		Note that not all implementations support this kind of operation and
+		may choose to call the callback immediately.
+
+		In addition to that, the caller needs to make sure that the socket is
+		not ready before calling this function in order to guarantee that the callback gets
+		called (e.g. by fully draining the socket first).
+	*/
+	void waitUntilReady(StreamSocketFD socket, IOReadiness event_mask, IOReadinessCallback on_ready);
+
 	/** Initiates a connection close.
 	*/
 	void shutdown(StreamSocketFD socket, bool shut_read, bool shut_write);
@@ -986,6 +997,7 @@ final class RefAddress : Address {
 alias ConnectCallback = void delegate(StreamSocketFD, ConnectStatus);
 alias AcceptCallback = void delegate(StreamListenSocketFD, StreamSocketFD, scope RefAddress remote_address);
 alias IOCallback = void delegate(StreamSocketFD, IOStatus, size_t);
+alias IOReadinessCallback = void delegate(FD, IOReadiness);
 alias DatagramIOCallback = void delegate(DatagramSocketFD, IOStatus, size_t, scope RefAddress);
 alias DNSLookupCallback = void delegate(DNSLookupID, DNSStatus, scope RefAddress[]);
 alias FileIOCallback = void delegate(FileFD, IOStatus, size_t);
@@ -1096,6 +1108,13 @@ enum IOStatus {
 	error,        /// An error occured while transferring the data
 	wouldBlock,    /// Returned for `IOMode.immediate` when no data is readily readable/writable
 	invalidHandle, /// The passed handle is not valid
+}
+
+enum IOReadiness {
+	none = 0,
+	read = 1 << 0,
+	write = 1 << 1,
+	readWrite = read | write
 }
 
 enum DNSStatus {
