@@ -180,7 +180,14 @@ final class EventDriverDNS_GAI(Events : EventDriverEvents, Signals : EventDriver
 					l.done = false;
 					if (i == m_maxHandle) m_maxHandle = lastmax;
 					m_events.loop.m_waiterCount--;
-					passToDNSCallback(DNSLookupID(i, l.validationCounter), cb, status, ai);
+					// An error happened, we have a return code
+					// We can directly call the delegate with it instead
+					// of calling `passToDNSCallback` (which doesn't support
+					// a `null` result on some platforms)
+					if (ai is null)
+						cb(DNSLookupID(i, l.validationCounter), status, null);
+					else
+						passToDNSCallback(DNSLookupID(i, l.validationCounter), cb, status, ai);
 				} else lastmax = i;
 			}
 		}
