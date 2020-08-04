@@ -150,7 +150,10 @@ final class EventDriverDNS_GAI(Events : EventDriverEvents, Signals : EventDriver
 		size_t lastmax;
 		foreach (i, ref l; m_lookups) {
 			if (i > m_maxHandle) break;
-			if (!atomicLoad(l.done)) continue;
+			if (!atomicLoad(l.done)) {
+				lastmax = i;
+				continue;
+			}
 			// synchronize the other fields in m_lookup with the lookup thread
 			atomicFence();
 
