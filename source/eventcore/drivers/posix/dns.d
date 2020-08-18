@@ -132,6 +132,7 @@ final class EventDriverDNS_GAI(Events : EventDriverEvents, Signals : EventDriver
 	{
 		if (!isValid(handle)) return;
 		m_lookups[handle].callback = null;
+		m_lookups[handle].result = null;
 		m_events.loop.m_waiterCount--;
 	}
 
