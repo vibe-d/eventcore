@@ -203,7 +203,7 @@ final class EventDriverDNS_GAI(Events : EventDriverEvents, Signals : EventDriver
 		assert(m_lookups.length <= int.max);
 		int id = cast(int)m_lookups.length;
 		foreach (i, ref l; m_lookups)
-			if (!l.callback) {
+			if (!l.callback && !l.result) {
 				id = cast(int)i;
 				break;
 			}
