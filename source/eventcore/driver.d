@@ -264,7 +264,6 @@ interface EventDriverSockets {
 		Note that only a single read operation is allowed at once. The caller
 		needs to make sure that either `on_read_finish` got called, or
 		`cancelRead` was called before issuing the next call to `read`.
-		However, concurrent writes are legal.
 
 		Waiting_for_data_availability:
 			With the special combination of a zero-length buffer and `mode`
@@ -291,7 +290,6 @@ interface EventDriverSockets {
 		Note that only a single write operation is allowed at once. The caller
 		needs to make sure that either `on_write_finish` got called, or
 		`cancelWrite` was called before issuing the next call to `write`.
-		However, concurrent reads are legal.
 	*/
 	void write(StreamSocketFD socket, const(ubyte)[] buffer, IOMode mode, IOCallback on_write_finish);
 
@@ -479,9 +477,34 @@ interface EventDriverFiles {
 	*/
 	void truncate(FileFD file, ulong size, FileIOCallback on_finish);
 
+	/** Writes data to a file
+
+		Note that only a single read operation is allowed at once. The caller
+		needs to make sure that either `on_read_finish` got called, or
+		`cancelRead` was called before issuing the next call to `read`.
+	*/
 	void write(FileFD file, ulong offset, const(ubyte)[] buffer, IOMode mode, FileIOCallback on_write_finish);
-	void read(FileFD file, ulong offset, ubyte[] buffer, IOMode mode, FileIOCallback on_read_finish);
+
+	/** Cancels an ongoing write operation.
+
+		After this function has been called, the `FileIOCallback` specified in
+		the call to `write` is guaranteed not to be called.
+	*/
 	void cancelWrite(FileFD file);
+
+	/** Reads data from a file.
+
+		Note that only a single read operation is allowed at once. The caller
+		needs to make sure that either `on_read_finish` got called, or
+		`cancelRead` was called before issuing the next call to `read`.
+	*/
+	void read(FileFD file, ulong offset, ubyte[] buffer, IOMode mode, FileIOCallback on_read_finish);
+
+	/** Cancels an ongoing read operation.
+
+		After this function has been called, the `FileIOCallback` specified in
+		the call to `read` is guaranteed not to be called.
+	*/
 	void cancelRead(FileFD file);
 
 	/** Determines whether the given file handle is valid.
