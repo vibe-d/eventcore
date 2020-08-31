@@ -191,13 +191,7 @@ final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTime
 		m_events = events;
 		m_processes = processes;
 		m_wakeupEvent = events.createInternal();
-
-		static if (__VERSION__ >= 2074)
-			m_threadCallbackMutex = mallocT!(shared(Mutex));
-		else {
-			() @trusted { m_threadCallbackMutex = cast(shared)mallocT!Mutex; } ();
-		}
-
+        m_threadCallbackMutex = mallocT!(shared(Mutex));
 		m_threadCallbacks = mallocT!(ConsumableQueue!ThreadCallbackEntry);
 		m_threadCallbacks.reserve(1000);
 	}
