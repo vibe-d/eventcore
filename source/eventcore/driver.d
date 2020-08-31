@@ -996,7 +996,19 @@ alias EventCallback = void delegate(EventID);
 alias SignalCallback = void delegate(SignalListenID, SignalStatus, int);
 alias TimerCallback = void delegate(TimerID);
 alias TimerCallback2 = void delegate(TimerID, bool fired);
-alias FileChangesCallback = void delegate(WatcherID, in ref FileChange change);
+// Support for `-preview=in`
+// Using template because of https://issues.dlang.org/show_bug.cgi?id=21207
+private template FileChangesCallbackWorkaround ()
+{
+	static if (!is(typeof(mixin(q{(in ref int a) => a}))))
+		alias FileChangesCallbackWorkaround = void delegate(WatcherID, in FileChange change);
+	else
+		mixin(q{
+			alias FileChangesCallbackWorkaround = void delegate(WatcherID, in ref FileChange change);
+		});
+}
+alias FileChangesCallback = FileChangesCallbackWorkaround!();
+
 alias ProcessWaitCallback = void delegate(ProcessID, int);
 @system alias DataInitializer = void function(void*) @nogc;
 
