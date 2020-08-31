@@ -37,7 +37,7 @@ final class WinAPIEventDriverDNS : EventDriverDNS {
 			return id;
 		}
 
-		version(none){ // Windows 8+
+		version (none) { // Windows 8+
 			LookupStatus status;
 			status.task = Task.getThis();
 			status.driver = this;
@@ -56,12 +56,12 @@ final class WinAPIEventDriverDNS : EventDriverDNS {
 			addr_hint.ai_protocol = IPPROTO_TCP;
 
 			enforce(GetAddrInfoExW(namew, null, NS_DNS, null, &addr_hint, &addr_ret, null, &overlapped, &onDnsResult, null) == 0, "Failed to lookup host");
-			while( !status.finished ) m_core.yieldForEvent();
+			while (!status.finished) m_core.yieldForEvent();
 			enforce(!status.error, "Failed to lookup host: "~to!string(status.error));
 
 			aif = addr_ret;
 			addr.family = cast(ubyte)addr_ret.ai_family;
-			switch(addr.family){
+			switch (addr.family) {
 				default: assert(false, "Invalid address family returned from host lookup.");
 				case AF_INET: addr.sockAddrInet4 = *cast(sockaddr_in*)addr_ret.ai_addr; break;
 				case AF_INET6: addr.sockAddrInet6 = *cast(sockaddr_in6*)addr_ret.ai_addr; break;

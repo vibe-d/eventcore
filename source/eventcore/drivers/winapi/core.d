@@ -217,10 +217,10 @@ final class WinAPIEventDriverCore : EventDriverCore {
 		/*if (ret == WAIT_OBJECT_0) {
 			got_event = true;
 			Win32TCPConnection[] to_remove;
-			foreach( fw; m_fileWriters.byKey )
-				if( fw.testFileWritten() )
+			foreach (fw; m_fileWriters.byKey)
+				if (fw.testFileWritten())
 					to_remove ~= fw;
-			foreach( fw; to_remove )
+			foreach (fw; to_remove)
 			m_fileWriters.remove(fw);
 		}*/
 

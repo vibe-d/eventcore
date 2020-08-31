@@ -1,6 +1,6 @@
 module eventcore.internal.win32;
 
-version(Windows):
+version (Windows):
 
 public import core.sys.windows.windows;
 public import core.sys.windows.winsock2;

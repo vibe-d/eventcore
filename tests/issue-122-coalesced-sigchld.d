@@ -65,7 +65,7 @@ void main(string[] args)
 		{
 			numProc--;
 			try writefln("Child %s exited with %s", pid, res);
-			catch(Exception){}
+			catch (Exception) {}
 		});
 	}
 

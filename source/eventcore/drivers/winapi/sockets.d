@@ -955,7 +955,7 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 	LRESULT onMessage(HWND wnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	{
 		auto driver = () @trusted { return cast(WinAPIEventDriverSockets)cast(void*)GetWindowLongPtrA(wnd, GWLP_USERDATA); } ();
-		switch(msg){
+		switch (msg) {
 			default: break;
 			case WM_USER_SOCKET:
 				SOCKET sock = cast(SOCKET)wparam;

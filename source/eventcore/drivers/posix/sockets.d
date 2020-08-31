@@ -64,7 +64,7 @@ version (linux) {
 	static if (!is(typeof(TCP_USER_TIMEOUT)))
 		enum TCP_USER_TIMEOUT = 18;
 }
-version(OSX) {
+version (OSX) {
 	static if (__VERSION__ < 2077) {
 		enum IP_ADD_MEMBERSHIP = 12;
 		enum IP_MULTICAST_LOOP = 11;
@@ -72,13 +72,13 @@ version(OSX) {
 
 	static if (!is(typeof(ESHUTDOWN))) enum ESHUTDOWN = 58;
 }
-version(FreeBSD) {
+version (FreeBSD) {
 	static if (__VERSION__ < 2077) {
 		enum IP_ADD_MEMBERSHIP  = 12;
 		enum IP_MULTICAST_LOOP  = 11;
 	} else import core.sys.freebsd.netinet.in_ : IP_ADD_MEMBERSHIP, IP_MULTICAST_LOOP;
 }
-version(DragonFlyBSD) {
+version (DragonFlyBSD) {
 	import core.sys.dragonflybsd.netinet.in_ : IP_ADD_MEMBERSHIP, IP_MULTICAST_LOOP;
 }
 version (Solaris) {

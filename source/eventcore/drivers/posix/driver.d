@@ -126,7 +126,7 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 					} catch (Exception ex) { print("exception happened in Driver.dispose() during formatting"); }
 		}
 
-		if(leaking_handle_desc.length) {
+		if (leaking_handle_desc.length) {
 			print("Warning (thread: %s): leaking eventcore driver because there are still active handles", getThreadName());
 			print(leaking_handle_desc);
 		}
