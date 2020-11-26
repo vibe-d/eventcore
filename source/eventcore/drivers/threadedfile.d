@@ -25,7 +25,7 @@ version (Windows) {
 			int close(int fd) @safe;
 			int read(int fd, void *buffer, uint count);
 			int write(int fd, in void *buffer, uint count);
-			off_t lseek(int fd, off_t offset, int whence) @safe;
+			long _lseeki64(int fd, long offset, int origin) @safe;
 		}
 
 		enum O_RDONLY = 0;
@@ -44,6 +44,11 @@ version (Windows) {
 else
 {
 	enum O_BINARY = 0;
+}
+
+version (darwin) {
+	// NOTE: Always building for 64-bit, so these are identical
+	alias lseek64 = lseek;
 }
 
 private {
@@ -197,7 +202,9 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents) : EventDriverFil
 
 		version (linux) {
 			// stat_t seems to be defined wrong on linux/64
-			return .lseek(cast(int)file, 0, SEEK_END);
+			return .lseek64(cast(int)file, 0, SEEK_END);
+		} else version (Windows) {
+			return _lseeki64(cast(int)file, 0, SEEK_END);
 		} else {
 			stat_t st;
 			() @trusted { fstat(cast(int)file, &st); } ();
@@ -361,9 +368,8 @@ log("start processing");
 
 		auto bytes = buffer;
 		version (Windows) {
-			assert(offset <= off_t.max);
-			.lseek(cast(int)file, cast(off_t)offset, SEEK_SET);
-		} else .lseek(cast(int)file, offset, SEEK_SET);
+			._lseeki64(cast(int)file, offset, SEEK_SET);
+		} else .lseek64(cast(int)file, offset, SEEK_SET);
 
 		scope (exit) {
 log("trigger event");
