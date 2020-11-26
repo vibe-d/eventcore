@@ -6,8 +6,8 @@ set -e -x -o pipefail
 dub build -b release --compiler=$DC -c $CONFIG
 
 # test for successful 32-bit build
-if [ "$DC" == "dmd" ]; then
-	dub build --arch=x86 -c $CONFIG
+if [ "$DC" == "ldc2" ]; then
+	dub build --arch=x86 --compiler=ldc2 -c $CONFIG
 fi
 
 dub test --compiler=$DC -c $CONFIG
@@ -18,7 +18,8 @@ if [ ${BUILD_EXAMPLE=1} -eq 1 ]; then
         dub build --compiler=$DC --override-config eventcore/$CONFIG --single $ex
     done
     rm -rf examples/.dub/
-    rm examples/*-example
+    rm -f examples/*-example
+    rm -f examples/*-example.exe
 fi
 if [ ${RUN_TEST=1} -eq 1 ]; then
     for ex in `\ls -1 tests/*.d`; do

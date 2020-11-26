@@ -1,0 +1,42 @@
+name: Test Suite
+
+# Only triggers on pushes/PRs to master
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+jobs:
+    test:
+        name: CI
+        strategy:
+            matrix:
+                os: [ubuntu-latest, windows-latest, macOS-latest]
+                dc: [dmd-latest, ldc-latest]
+                arch: [x86_64]
+                config: [select, epoll, cfrunloop, winapi]
+                exclude:
+                  - {os: ubuntu-latest, config: cfrunloop}
+                  - {os: ubuntu-latest, config: winapi}
+                  - {os: macOS-latest, config: epoll}
+                  - {os: macOS-latest, config: winapi}
+                  - {os: windows-latest, config: cfrunloop}
+                  - {os: windows-latest, config: epoll}
+
+        runs-on: ${{ matrix.os }}
+        steps:
+            - uses: actions/checkout@v2
+
+            - name: Install D compiler
+              uses: dlang-community/setup-dlang@v1
+              with:
+                  compiler: ${{ matrix.dc }}
+
+            - name: Run tests
+              env:
+                CONFIG: ${{matrix.config}}
+              shell: bash
+              run: ./travis-ci.sh
