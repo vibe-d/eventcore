@@ -336,6 +336,13 @@ package class PosixEventLoop {
 
 	protected abstract void dispose();
 
+	/** Waits for and processes a single batch of events.
+
+		Returns:
+			Returns `false` if no event was received before the timeout expired
+			and `true` if either an event was received, or if the wait was
+			interrupted by an error or signal.
+	*/
 	protected abstract bool doProcessEvents(Duration dur);
 
 	/// Registers the FD for general notification reception.
