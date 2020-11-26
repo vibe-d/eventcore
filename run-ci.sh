@@ -24,6 +24,8 @@ fi
 if [ ${RUN_TEST=1} -eq 1 ]; then
     for ex in `\ls -1 tests/*.d`; do
         echo "[INFO] Running test $ex"
-        dub --temp-build --arch=$ARCH --compiler=$DC --override-config eventcore/$CONFIG --single $ex
+        # NOTE: timer and directory watcher tests tend to be flaky on macOS VMs
+        dub --temp-build --arch=$ARCH --compiler=$DC --override-config eventcore/$CONFIG --single $ex \
+            || dub --temp-build --arch=$ARCH --compiler=$DC --override-config eventcore/$CONFIG --single $ex
     done
 fi
