@@ -85,7 +85,16 @@ abstract class KqueueEventLoopBase : PosixEventLoop {
 				// EV_SIGNAL, EV_TIMEOUT
 			}
 			return true;
-		} else return false;
+		} else {
+			// NOTE: In particular, EINTR needs to cause true to be returned
+			//       here, so that user code has a chance to handle any effects
+			//       of the signal handler before waiting again.
+			//
+			//       Other errors are very likely to to reoccur for the next
+			//       loop iteration, so there is no value in attempting to
+			//       wait again.
+			return ret < 0;
+		}
 	}
 
 	override void dispose()

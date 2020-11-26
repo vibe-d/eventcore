@@ -85,6 +85,12 @@ interface EventDriverCore {
 		in the event queue. The function will return after either the specified
 		timeout has elapsed, or once the event queue has been fully emptied.
 
+		On implementations that support it, the function will treat
+		interruptions by POSIX signals as if an event was received and will
+		cause it to return. However, note that it is generally recommended to
+		use `EventDriverSignals` instead of raw signal handlers in order to
+		avoid their pitfalls as far as possible.
+
 		Params:
 			timeout = Maximum amount of time to wait for an event. A duration of
 				zero will cause the function to only process pending events. A
