@@ -18,7 +18,8 @@ if [ ${BUILD_EXAMPLE=1} -eq 1 ]; then
         dub build --compiler=$DC --override-config eventcore/$CONFIG --single $ex
     done
     rm -rf examples/.dub/
-    rm examples/*-example
+    rm -f examples/*-example
+    rm -f examples/*-example.exe
 fi
 if [ ${RUN_TEST=1} -eq 1 ]; then
     for ex in `\ls -1 tests/*.d`; do
