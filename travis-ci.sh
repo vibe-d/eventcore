@@ -6,8 +6,8 @@ set -e -x -o pipefail
 dub build -b release --compiler=$DC -c $CONFIG
 
 # test for successful 32-bit build
-if [ "$DC" == "dmd" ]; then
-	dub build --arch=x86 -c $CONFIG
+if [ "$DC" == "ldc2" ]; then
+	dub build --arch=x86 --compiler=ldc2 -c $CONFIG
 fi
 
 dub test --compiler=$DC -c $CONFIG
