@@ -36,25 +36,13 @@ configuration "kqueue" {
 }
 
 configuration "winapi" {
-	platforms "windows-x86_64" "windows-x86_mscoff" "windows-ldc" "windows-gdc"
+	platforms "windows"
 	versions "EventcoreWinAPIDriver"
 }
 
 configuration "select" {
-	platforms "posix" "windows-x86_64" "windows-x86_mscoff"
+	platforms "posix" "windows"
 	versions "EventcoreSelectDriver"
-}
-
-configuration "winapi-optlink" {
-	platforms "windows-x86-dmd"
-	versions "EventcoreWinAPIDriver"
-	sourceFiles "lib/ws2_32.lib" "lib/kernel32.lib"
-}
-
-configuration "select-optlink" {
-	platforms "windows-x86-dmd"
-	versions "EventcoreSelectDriver"
-	sourceFiles "lib/ws2_32.lib" "lib/kernel32.lib"
 }
 
 configuration "libasync" {
