@@ -399,7 +399,7 @@ log("trigger event");
 		if (bytes.length == 0) safeAtomicStore(f.ioStatus, IOStatus.ok);
 
 		while (bytes.length > 0) {
-			auto sz = min(bytes.length, 4096);
+			auto sz = min(bytes.length, 512*1024);
 			auto ret = () @trusted { return mixin("."~op)(cast(int)file, bytes.ptr, cast(uint)sz); } ();
 			if (ret != sz) {
 				safeAtomicStore(f.ioStatus, IOStatus.error);
