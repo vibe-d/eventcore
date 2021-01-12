@@ -224,6 +224,26 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents) : EventDriverFil
 				return;
 			}
 			on_finish(file, IOStatus.ok, 0);
+		} else version (Windows) {
+			import core.sys.windows.windows : FILE_BEGIN, HANDLE, INVALID_HANDLE_VALUE,
+				LARGE_INTEGER, SetFilePointerEx, SetEndOfFile;
+			import core.stdc.stdio : _get_osfhandle;
+
+			auto h = () @trusted { return cast(HANDLE)_get_osfhandle(cast(int)file); } ();
+			if (h == INVALID_HANDLE_VALUE) {
+				on_finish(file, IOStatus.error, 0);
+				return;
+			}
+			LARGE_INTEGER ls = { QuadPart: size };
+			if (!() @trusted { return SetFilePointerEx(h, ls, null, FILE_BEGIN); } ()) {
+				on_finish(file, IOStatus.error, 0);
+				return;
+			}
+			if (!() @trusted { return SetEndOfFile(h); } ()) {
+				on_finish(file, IOStatus.error, 0);
+				return;
+			}
+			on_finish(file, IOStatus.ok, 0);
 		} else {
 			on_finish(file, IOStatus.error, 0);
 		}
