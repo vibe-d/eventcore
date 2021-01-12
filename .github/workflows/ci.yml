@@ -34,6 +34,9 @@ jobs:
                   - {os: windows-latest, dc: ldc-1.9.0, config: select}
                   - {os: windows-latest, dc: ldc-1.17.0}
                   - {os: ubuntu-latest, dc: ldc-1.17.0}
+                include:
+                  - {os: windows-latest, dc: ldc-latest, arch: x86, config: winapi}
+                  - {os: windows-latest, dc: dmd-latest, arch: x86_mscoff, config: winapi}
 
         runs-on: ${{ matrix.os }}
         steps:
