@@ -64,7 +64,7 @@ final class PosixEventDriverProcesses(Loop : PosixEventLoop) : EventDriverProces
 		string working_dir)
 	@trusted {
 		// Use std.process to spawn processes
-		import std.process : pipe, Pid, spawnProcess;
+		import std.process : pipe, Pid, spawnProcess, StdProcessConfig = Config;
 		import std.stdio : File;
 		static import std.stdio;
 
@@ -141,7 +141,7 @@ final class PosixEventDriverProcesses(Loop : PosixEventLoop) : EventDriverProces
 				stdoutFile,
 				stderrFile,
 				env,
-				cast(std.process.Config)config,
+				cast(StdProcessConfig)config,
 				working_dir);
 			process.pid = adopt(stdPid.osHandle);
 			stdPid.destroy();
