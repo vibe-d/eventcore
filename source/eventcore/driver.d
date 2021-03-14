@@ -1019,6 +1019,7 @@ alias AcceptCallback = void delegate(StreamListenSocketFD, StreamSocketFD, scope
 alias IOCallback = void delegate(StreamSocketFD, IOStatus, size_t);
 alias DatagramIOCallback = void delegate(DatagramSocketFD, IOStatus, size_t, scope RefAddress);
 alias DNSLookupCallback = void delegate(DNSLookupID, DNSStatus, scope RefAddress[]);
+alias FileOpenCallback = void delegate(FileFD);
 alias FileIOCallback = void delegate(FileFD, IOStatus, size_t);
 alias FileCloseCallback = void delegate(FileFD, CloseStatus);
 alias PipeIOCallback = void delegate(PipeFD, IOStatus, size_t);

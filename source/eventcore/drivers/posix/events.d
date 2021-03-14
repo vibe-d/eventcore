@@ -80,7 +80,6 @@ final class PosixEventDriverEvents(Loop : PosixEventLoop, Sockets : EventDriverS
 				if (!() @trusted {
 					fd[1] = socket(AF_INET, SOCK_DGRAM, 0);
 					int nl = addr.nameLen;
-					import eventcore.internal.utils : print;
 					if (bind(fd[1], addr.name, addr.nameLen) != 0)
 						return false;
 					assert(nl == addr.nameLen);
@@ -167,7 +166,9 @@ final class PosixEventDriverEvents(Loop : PosixEventLoop, Sockets : EventDriverS
 		@trusted {
 			EventID event = cast(EventID)fd;
 			ulong cnt;
-			() @trusted { .read(cast(int)event, &cnt, cnt.sizeof); } ();
+			() @trusted {
+				.read(cast(int)event, &cnt, cnt.sizeof);
+			} ();
 			trigger(event, cnt > 0);
 		}
 	} else {

@@ -6,6 +6,8 @@ eventcore_src = [
 	'drivers/posix/driver.d',
 	'drivers/posix/epoll.d',
 	'drivers/posix/events.d',
+	'drivers/posix/io_uring/io_uring.d',
+	'drivers/posix/io_uring/files.d',
 	'drivers/posix/kqueue.d',
 	'drivers/posix/pipes.d',
 	'drivers/posix/processes.d',
