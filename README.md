@@ -22,6 +22,7 @@ WinAPIEventDriver    | &mdash; | yes     | &mdash; | &mdash; | &mdash; | &mdash;
 KqueueEventDriver    | &mdash; | &mdash; | yes     | yes¹    | &mdash; | yes
 CFRunloopEventDriver | &mdash; | &mdash; | yes     | &mdash; | &mdash; | yes
 LibasyncEventDriver  | &mdash;¹| &mdash;¹| &mdash;¹| &mdash;¹| &mdash; | &mdash;
+UringEventDriver     | &mdash;¹| no      | no      | no      | unknown | no
 
 ¹ planned, but not currenly implemented
 
@@ -40,20 +41,20 @@ The following compilers are tested and supported:
 Driver development status
 -------------------------
 
-Feature \ EventDriver | Select | Epoll | WinAPI  | Kqueue  | CFRunloop | Libasync
-----------------------|--------|-------|---------|---------|-----------|----------
-TCP Sockets           | yes    | yes   | yes     | yes     | yes       | &mdash;
-UDP Sockets           | yes    | yes   | yes     | yes     | yes       | &mdash;
-USDS                  | yes    | yes   | &mdash; | yes     | yes       | &mdash;
-DNS                   | yes    | yes   | yes     | yes     | yes       | &mdash;
-Timers                | yes    | yes   | yes     | yes     | yes       | &mdash;
-Events                | yes    | yes   | yes     | yes     | yes       | &mdash;
-Unix Signals          | yes²   | yes   | &mdash; | &mdash; | &mdash;   | &mdash;
-Files                 | yes    | yes   | yes     | yes     | yes       | &mdash;
-UI Integration        | yes¹   | yes¹  | yes     | yes¹    | yes¹      | &mdash;
-File watcher          | yes²   | yes   | yes     | yes²    | yes²      | &mdash;
-Pipes                 | yes    | yes   | &mdash; | yes     | yes       | &mdash;
-Processes             | yes    | yes   | &mdash; | yes     | yes       | &mdash;
+Feature \ EventDriver | Select | Epoll | WinAPI  | Kqueue  | CFRunloop | Libasync | Uring
+----------------------|--------|-------|---------|---------|-----------|----------|-------
+TCP Sockets           | yes    | yes   | yes     | yes     | yes       | &mdash;  | &mdash;
+UDP Sockets           | yes    | yes   | yes     | yes     | yes       | &mdash;  | &mdash;
+USDS                  | yes    | yes   | &mdash; | yes     | yes       | &mdash;  | &mdash;
+DNS                   | yes    | yes   | yes     | yes     | yes       | &mdash;  | &mdash;
+Timers                | yes    | yes   | yes     | yes     | yes       | &mdash;  | &mdash;
+Events                | yes    | yes   | yes     | yes     | yes       | &mdash;  | &mdash;
+Unix Signals          | yes²   | yes   | &mdash; | &mdash; | &mdash;   | &mdash;  | &mdash;
+Files                 | yes    | yes   | yes     | yes     | yes       | &mdash;  | yes
+UI Integration        | yes¹   | yes¹  | yes     | yes¹    | yes¹      | &mdash;  | yes?
+File watcher          | yes²   | yes   | yes     | yes²    | yes²      | &mdash;  | &mdash;
+Pipes                 | yes    | yes   | &mdash; | yes     | yes       | &mdash;  | &mdash;
+Processes             | yes    | yes   | &mdash; | yes     | yes       | &mdash;  | &mdash;
 
 ¹ Manually, by adopting the X11 display connection socket
 
