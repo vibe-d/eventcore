@@ -680,26 +680,40 @@ interface EventDriverSignals {
 interface EventDriverTimers {
 @safe: /*@nogc:*/ nothrow:
 	TimerID create();
+
 	/** Run the timer.
-	    Important: the callback of the timer will be called exactly once. You 
-		should call `wait` again after the timer triggered to call the callback
-		on the next firing, see https://github.com/vibe-d/eventcore/issues/172
-		for reasons behind that behavior
 
 		Params:
 			timer = the id of the timer, created by `create` call.
 			timeout = a duration to the first firing of the timer
-			repeat  = a duration between the next timer firings
+			repeat = a duration between periodic timer firings - set to zero
+				to set a single-fire timer
 	*/
 	void set(TimerID timer, Duration timeout, Duration repeat);
+
 	void stop(TimerID timer);
+
 	bool isPending(TimerID timer);
 	bool isPeriodic(TimerID timer);
+
+	/** Waits for the timer to fire.
+
+		Important: the callback of the timer will be called exactly once, unless
+		`cancelWait` gets called first. `wait` needs to be called again to
+		receive future timer events (see https://github.com/vibe-d/eventcore/issues/172
+		for reasons behind that behavior).
+
+		Note that the `TimerCallback` based overload will not call the
+		callback if `stop` gets called before the timer fires, whereas the
+		`TimerCallback2` based overload will call the callback with the `fired`
+		parameter set to `false`.
+	*/
 	final void wait(TimerID timer, TimerCallback callback) {
 		wait(timer, (tm, fired) {
 			if (fired) callback(tm);
 		});
 	}
+	/// ditto
 	void wait(TimerID timer, TimerCallback2 callback);
 	void cancelWait(TimerID timer);
 
