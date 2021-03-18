@@ -680,6 +680,17 @@ interface EventDriverSignals {
 interface EventDriverTimers {
 @safe: /*@nogc:*/ nothrow:
 	TimerID create();
+	/** Run the timer.
+	    Important: the callback of the timer will be called exactly once. You 
+		should call `wait` again after the timer triggered to call the callback
+		on the next firing, see https://github.com/vibe-d/eventcore/issues/172
+		for reasons behind that behavior
+
+		Params:
+			timer = the id of the timer, created by `create` call.
+			timeout = a duration to the first firing of the timer
+			repeat  = a duration between the next timer firings
+	*/
 	void set(TimerID timer, Duration timeout, Duration repeat);
 	void stop(TimerID timer);
 	bool isPending(TimerID timer);
