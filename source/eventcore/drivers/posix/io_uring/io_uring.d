@@ -54,7 +54,6 @@ import std.stdio;
 /// eventcore allows exactly one simultaneous operation per kind per
 /// descriptor.
 enum EventType {
-	none,
 	read,
 	write,
 	status
@@ -78,15 +77,18 @@ alias OpCallback = void delegate(FD, ref const(CompletionEntry), UserCallback) n
 // should be available without creating a real closure for OpCallback.
 struct OpData
 {
+	FD fd;
 	OpCallback opCb;
 	UserCallback userCb;
 }
+
+alias OpIdx = std.typecons.Typedef!(int, -1, "eventcore.OpIdx");
 
 // information regarding a specific resource / descriptor
 private struct ResourceData
 {
 	// from the os, file descriptor, socket etc
-	int descriptor;
+	int descriptor = -1;
 	// ref count, we'll clean up internal data structures
 	// if this reaches zero
 	uint refCount;
@@ -96,7 +98,8 @@ private struct ResourceData
 	uint validationCounter;
 
 	// to track that at most one op per EventType is ongoing
-	OpData[EventType.max+1] runningOps;
+	// contains the userData field of the resp. ops
+	OpIdx[EventType.max+1] runningOps;
 }
 
 // the user can store extra information per resource
@@ -116,6 +119,7 @@ final class UringEventLoop
 	private {
 		Uring m_io;
 		ChoppedVector!(ResourceData) m_fds;
+		ChoppedVector!(OpData) m_ops;
 		int m_runningOps;
 	}
 
@@ -164,8 +168,8 @@ final class UringEventLoop
 			// cancel all pendings ops
 			foreach (type; EnumMembers!EventType)
 			{
-				if (fds.runningOps[type].opCb != null)
-					cancelOp(fd, type);
+				if (fds.runningOps[type] != OpIdx.init)
+					cancelOp(fds.runningOps[type], type);
 			}
 		}
 		return fds.refCount == 0;
@@ -179,6 +183,7 @@ final class UringEventLoop
 	bool doProcessEvents(Duration timeout, bool dontWait = true) nothrow @trusted
 	{
 		import std.algorithm : max;
+		import std.typecons : TypedefType;
 
 		// we add a timeout so that we do not wait indef.
 		if (!dontWait && timeout != Duration.max)
@@ -205,21 +210,22 @@ final class UringEventLoop
 			// internally used timeouts
 			if (e.user_data == ulong.max)
 				continue;
-			int fd;
+			OpIdx opIdx;
 			EventType type;
 			// let the specific driver handle the rest
-			splitKey(e.user_data, fd, type);
-			assert (fd < m_fds.length);
-			OpData* op = &m_fds[fd].runningOps[type];
+			splitKey(e.user_data, opIdx, type);
+			OpData* op = &m_ops[cast(TypedefType!OpIdx) opIdx];
+			assert (op.fd == FD.init || isValid(op.fd));
 			// cb might be null, if the operation was cancelled
 			if (op.opCb)
 			{
+				print("reset op: %s", opIdx);
+				// e.g. open sets m_fds to FD.init
+				if (op.fd != FD.init)
+					m_fds[op.fd].runningOps[type] = OpIdx.init;
 				m_runningOps -= 1;
-				op.opCb(FD(fd, m_fds[fd].validationCounter), e, op.userCb);
+				op.opCb(op.fd, e, op.userCb);
 				*op = OpData.init;
-			} else if (m_fds[fd].runningOps[].all!(x => x.opCb == null))
-			{
-				resetFD(m_fds[fd]);
 			}
 		}
 		return gotEvents;
@@ -227,7 +233,9 @@ final class UringEventLoop
 
 	void resetFD(ref ResourceData data) nothrow @nogc
 	{
-		data.descriptor = 0;
+		int vc = data.validationCounter;
+		data = ResourceData.init;
+		data.validationCounter = vc + 1;
 	}
 
 	@property size_t waiterCount() const nothrow @safe { return m_runningOps; }
@@ -236,7 +244,7 @@ final class UringEventLoop
 	{
 		auto slot = &m_fds[fd];
 		assert (slot.refCount == 0, "Initializing referenced file descriptor slot.");
-		assert (slot.descriptor == 0, "Initializing referenced file descriptor slot.");
+		assert (slot.descriptor == -1, "Initializing referenced file descriptor slot.");
 		slot.refCount = 1;
 		return FDType(fd, slot.validationCounter);
 	}
@@ -244,27 +252,51 @@ final class UringEventLoop
 	package void put(in FD fd, in EventType type, SubmissionEntry e,
 		OpCallback cb, UserCallback userCb) nothrow
 	{
+		import std.typecons : TypedefType;
 		m_runningOps += 1;
-		ulong userData = combineKey(cast(int) fd, type);
+		OpIdx idx = allocOpData();
+		ulong userData = combineKey(idx, type);
 		e.user_data = userData;
 		m_io.put(e);
-		assert (m_fds[fd.value].runningOps[type].opCb == null);
-		m_fds[fd.value].runningOps[type] = OpData(cb, userCb);
+		if (fd != FD.init)
+		{
+			ResourceData* res = &m_fds[fd.value];
+			assert (res.runningOps[type] == OpIdx.init);
+			res.runningOps[type] = idx;
+		}
+		m_ops[cast(TypedefType!OpIdx) idx] = OpData(fd, cb, userCb);
 	}
 
-	void cancelOp(FD fd, EventType type) @trusted nothrow @nogc
+	void cancelOp(FD fd, EventType type) @safe nothrow @nogc
 	{
 		if (!isValid(fd))
-		{
-			print("cancel for invalid fd");
 			return;
-		}
-		if (m_fds[fd].runningOps[type] == OpData.init)
+
+		OpIdx idx = m_fds[fd].runningOps[type];
+		if (idx != OpIdx.init)
+			cancelOp(idx, type);
+	}
+
+	void cancelOp(OpIdx opIdx, EventType type) @trusted nothrow @nogc
+	{
+		import std.typecons : TypedefType;
+		OpData* opData = &m_ops[cast(TypedefType!OpIdx)opIdx];
+		if (opData.fd != FD.init)
 		{
-			print("cancelling op that's not running");
-			return;
+			if (!isValid(opData.fd))
+			{
+				print("cancel for invalid fd");
+				return;
+			}
+			if (m_fds[opData.fd].runningOps[type] == OpIdx.init)
+			{
+				print("cancelling op that's not running");
+				return;
+			}
+			m_fds[opData.fd].runningOps[type] = OpIdx.init;
 		}
-		ulong op = combineKey(cast(int) fd, type);
+		print("cancel op: %s", opIdx);
+		ulong op = combineKey(opIdx, type);
 		m_io.putWith!((ref SubmissionEntry e, ulong op)
 		{
 			// result is ignored (own userData is ulong.max)
@@ -272,7 +304,6 @@ final class UringEventLoop
 			e.user_data = ulong.max;
 		})(op);
 		m_runningOps -= 1;
-		m_fds[fd].runningOps[type] = OpData.init;
 	}
 
 	package void* rawUserData(FD descriptor, size_t size, DataInitializer initialize, DataInitializer destroy)
@@ -286,27 +317,47 @@ final class UringEventLoop
 	{
 		return null;
 	}
+
+	OpIdx allocOpData() nothrow @nogc
+	{
+		// TODO: use a free list or sth
+		for (int i = 0; ; ++i)
+		{
+			OpData* opData = &m_ops[i];
+			// TODO need to distinguish cancelled and virgin slots
+			if (*opData == OpData.init)
+			{
+				print("allocop %s", i);
+				return OpIdx(i);
+			}
+		}
+		assert(0);
+	}
 }
 
-void splitKey(ulong key, out int fd, out EventType type) @nogc nothrow
+void splitKey(ulong key, out OpIdx op, out EventType type) @nogc nothrow
+out { assert(op != OpIdx.init); }
+body
 {
-	fd = cast(int) (key >> 32);
+	op = cast(int) (key >> 32);
 	type = cast(EventType) ((key << 32) >>> 32);
 }
 
-ulong combineKey(int fd, EventType type) @nogc nothrow
+ulong combineKey(OpIdx op, EventType type) @nogc nothrow
+in { assert(op != OpIdx.init); }
+body
 {
-	return cast(ulong)(fd) << 32 | cast(int) type;
+	return cast(ulong)(op) << 32 | cast(uint) type;
 }
 
 @nogc nothrow
 unittest
 {
-	ulong orig = 0xDEAD0001;
-	int fd;
+	ulong orig = 0xDEAD_BEEF_DECAF_BAD;
+	OpIdx op;
 	EventType type;
-	splitKey(orig, fd, type);
-	assert (type == cast(EventType)1);
-	assert (fd == 0xDEAD);
-	assert (orig == combineKey(driver, op));
+	splitKey(orig, op, type);
+	assert (type == cast(EventType)0xDECAFBAD);
+	assert (op == 0xDEADBEEF);
+	assert (orig == combineKey(op, type));
 }
