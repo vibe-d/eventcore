@@ -46,9 +46,39 @@ final class UringDriverFiles : EventDriverFiles
 		return adopt(fd);
 	}
 
-	void open(string path, FileOpenMode mode, FileOpenCallback)
+	void open(string path, FileOpenMode mode, FileOpenCallback userCb)
 	{
-		//TODO how do we handle ops without a prior resource/fd?
+		import std.string : toStringz;
+		import std.conv : octal;
+
+		int flags;
+		int amode;
+
+		final switch (mode) {
+			case FileOpenMode.read: flags = O_RDONLY; break;
+			case FileOpenMode.readWrite: flags = O_RDWR; break;
+			case FileOpenMode.createTrunc: flags = O_RDWR|O_CREAT|O_TRUNC; amode = octal!644; break;
+			case FileOpenMode.append: flags = O_WRONLY|O_CREAT|O_APPEND; amode = octal!644; break;
+		}
+
+		SubmissionEntry e;
+		prepOpenat(e, AT_FDCWD, path.toStringz, flags, amode);
+		m_loop.put(FD.init, EventType.status, e, &handleOpen, cast(UserCallback) userCb);
+	}
+
+	private void handleOpen(FD fd, ref const(CompletionEntry) e, UserCallback userCb)
+		nothrow
+	in { assert (fd == FD.init); }
+	body
+	{
+		FileOpenCallback cb = cast(FileOpenCallback) userCb;
+		if (e.res == -1)
+		{
+			cb(FileFD.init, IOStatus.error);
+			return;
+		}
+		FileFD fileFD = adopt(e.res);
+		cb(fileFD, IOStatus.ok);
 	}
 
 	FileFD adopt(int system_file_handle)
@@ -76,11 +106,6 @@ final class UringDriverFiles : EventDriverFiles
 			cast(UserCallback) onClosed);
 	}
 
-	private void onCompletionEvent(int fd, EventType type, ref const(CompletionEntry) e,
-		UserCallback cb)
-	{
-	}
-
 	private void handleClose(FD fd, ref const(CompletionEntry) e, UserCallback userCb)
 		nothrow
 	{
@@ -89,11 +114,6 @@ final class UringDriverFiles : EventDriverFiles
 			cb(cast(FileFD) fd, CloseStatus.ioError);
 		else
 			cb(cast(FileFD) fd, CloseStatus.ok);
-	}
-
-	private void handleOpen(FD fd, ref const(CompletionEntry) e, UserCallback cb)
-	{
-
 	}
 
 	ulong getSize(FileFD file)
@@ -105,6 +125,7 @@ final class UringDriverFiles : EventDriverFiles
 		// stat_t seems to be defined wrong on linux/64
 		return lseek64(cast(int)file, 0, SEEK_END);
 	}
+
 
 	/** Shrinks or extends a file to the specified size.
 
