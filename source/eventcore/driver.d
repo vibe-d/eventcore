@@ -999,14 +999,14 @@ final class RefAddress : Address {
 	this() @safe nothrow {}
 	this(sockaddr* addr, socklen_t addr_len) @safe nothrow { set(addr, addr_len); }
 
-	override @property sockaddr* name() { return m_addr; }
-	override @property const(sockaddr)* name() const { return m_addr; }
-	override @property socklen_t nameLen() const { return m_addrLen; }
+	override @property sockaddr* name() scope { return m_addr; }
+	override @property const(sockaddr)* name() const scope { return m_addr; }
+	override @property socklen_t nameLen() const scope { return m_addrLen; }
 
 	void set(sockaddr* addr, socklen_t addr_len) @safe nothrow { m_addr = addr; m_addrLen = addr_len; }
 
 	void cap(socklen_t new_len)
-	@safe nothrow {
+	scope @safe nothrow {
 		assert(new_len <= m_addrLen, "Cannot grow size of a RefAddress.");
 		m_addrLen = new_len;
 	}

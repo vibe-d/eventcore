@@ -117,7 +117,8 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 	{
 		assert(on_connect !is null);
 
-		auto sockfd = createSocket(address.addressFamily, SOCK_STREAM);
+		// @trusted to escape DIP1000's `scope` check
+		auto sockfd = () @trusted { return createSocket(address.addressFamily, SOCK_STREAM); }();
 		if (sockfd == -1) {
 			on_connect(StreamSocketFD.invalid, ConnectStatus.socketCreateFailure);
 			return StreamSocketFD.invalid;
@@ -221,7 +222,8 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 	alias listenStream = EventDriverSockets.listenStream;
 	final override StreamListenSocketFD listenStream(scope Address address, StreamListenOptions options, AcceptCallback on_accept)
 	{
-		auto sockfd = createSocket(address.addressFamily, SOCK_STREAM);
+		// @trusted to escape DIP1000's `scope` check
+		auto sockfd = () @trusted { return createSocket(address.addressFamily, SOCK_STREAM); }();
 		if (sockfd == -1) return StreamListenSocketFD.invalid;
 
 		auto succ = () @trusted {
@@ -703,7 +705,8 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 
 	package DatagramSocketFD createDatagramSocketInternal(scope Address bind_address, scope Address target_address, bool is_internal = true)
 	{
-		auto sockfd = createSocket(bind_address.addressFamily, SOCK_DGRAM);
+		// @trusted to escape DIP1000's `scope` check
+		auto sockfd = () @trusted { return createSocket(bind_address.addressFamily, SOCK_DGRAM); }();
 		if (sockfd == -1) return DatagramSocketFD.invalid;
 
 		if (bind_address && () @trusted { return bind(sockfd, bind_address.name, bind_address.nameLen); } () != 0) {
@@ -773,7 +776,8 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 	{
 		if (!isValid(socket)) return false;
 
-		switch (multicast_address.addressFamily) {
+		// @trusted to escape DIP1000's `scope` check
+		switch (() @trusted { return multicast_address.addressFamily; }()) {
 			default: assert(false, "Multicast only supported for IPv4/IPv6 sockets.");
 			case AddressFamily.INET:
 				struct ip_mreq {
