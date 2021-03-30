@@ -99,7 +99,7 @@ abstract class KqueueEventLoopBase : PosixEventLoop {
 
 	override void dispose()
 	{
-
+		super.dispose();
 		import core.sys.posix.unistd : close;
 		close(m_queue);
 	}

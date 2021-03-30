@@ -79,6 +79,7 @@ final class SelectEventLoop : PosixEventLoop {
 
 	override void dispose()
 	{
+		super.dispose();
 	}
 
 	override void registerFD(FD fd, EventMask mask, bool edge_triggered = true)
