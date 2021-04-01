@@ -110,6 +110,18 @@ private struct UserData
 	ubyte[16*size_t.sizeof] userData;
 }
 
+
+/// substitue for UringCore that does nothing for
+/// non-uring posix event loops
+final class NoRing
+{
+	void registerEventID(EventID id) nothrow @trusted @nogc { }
+	void submit() nothrow @trusted @nogc { }
+	@property size_t waiterCount() const nothrow @safe { return 0; }
+	bool doProcessEvents(Duration timeout, bool dontWait = true) nothrow @trusted { return false; }
+}
+
+
 ///
 final class UringEventLoop
 {
