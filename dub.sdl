@@ -2,7 +2,6 @@ name "eventcore"
 description "Pro-actor based abstraction layer over operating system asynchronous I/O facilities."
 license "MIT"
 copyright "Copyright © 2016-2018 Sönke Ludwig"
-license "MIT"
 dependency "during" version="~>0.2.1"
 targetType "library"
 
@@ -49,6 +48,11 @@ configuration "select" {
 configuration "libasync" {
 	dependency "libasync" version="~>0.8.2"
 	versions "EventcoreLibasyncDriver"
+}
+
+configuration "uring" {
+	platforms "linux"
+	versions "EventcoreEpollDriver" "EventcoreEpollUsesUring"
 }
 
 configuration "generic" {

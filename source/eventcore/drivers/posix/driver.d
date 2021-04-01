@@ -14,7 +14,7 @@ import eventcore.drivers.posix.sockets;
 import eventcore.drivers.posix.watchers;
 import eventcore.drivers.posix.processes;
 import eventcore.drivers.posix.pipes;
-import eventcore.drivers.posix.io_uring.io_uring : UringEventLoop;
+import eventcore.drivers.posix.io_uring.io_uring : UringEventLoop, NoRing;
 import eventcore.drivers.posix.io_uring.files : UringDriverFiles;
 import eventcore.drivers.timer;
 import eventcore.drivers.threadedfile;
@@ -39,12 +39,17 @@ private long currStdTime()
 	return Clock.currStdTime;
 }
 
+version(EventcoreEpollUsesUring) {
+	version (EventcoreEpollDriver) {}
+	else { static assert(false, "uring only supported together with epoll for now"); }
+}
+
 final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 @safe: /*@nogc:*/ nothrow:
 
 
 	private {
-		alias CoreDriver = PosixEventDriverCore!(Loop, TimerDriver, EventsDriver, ProcessDriver);
+		alias CoreDriver = PosixEventDriverCore!(Loop, TimerDriver, EventsDriver, ProcessDriver, UringCore);
 		alias EventsDriver = PosixEventDriverEvents!(Loop, SocketsDriver);
 		version (linux) alias SignalsDriver = SignalFDEventDriverSignals!Loop;
 		else alias SignalsDriver = DummyEventDriverSignals!Loop;
@@ -53,7 +58,7 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 		version (Windows) alias DNSDriver = EventDriverDNS_GHBN!(EventsDriver, SignalsDriver);
 		else version (EventcoreUseGAIA) alias DNSDriver = EventDriverDNS_GAIA!(EventsDriver, SignalsDriver);
 		else alias DNSDriver = EventDriverDNS_GAI!(EventsDriver, SignalsDriver);
-		version (linux) alias FileDriver = UringDriverFiles;
+		version (EventcoreEpollUsesUring) alias FileDriver = UringDriverFiles;
 		else alias FileDriver = ThreadedFileEventDriver!EventsDriver;
 		version (Posix) alias PipeDriver = PosixEventDriverPipes!Loop;
 		else alias PipeDriver = DummyEventDriverPipes!Loop;
@@ -62,9 +67,11 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 		else alias WatcherDriver = PollEventDriverWatchers!EventsDriver;
 		version (Posix) alias ProcessDriver = PosixEventDriverProcesses!Loop;
 		else alias ProcessDriver = DummyEventDriverProcesses!Loop;
+		version (EventcoreEpollUsesUring) alias UringCore = UringEventLoop;
+		else alias UringCore = NoRing;
 
 		Loop m_loop;
-		version (linux) UringEventLoop m_uring;
+		UringCore m_uring;
 		CoreDriver m_core;
 		EventsDriver m_events;
 		SignalsDriver m_signals;
@@ -80,17 +87,19 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 	this()
 	@nogc @trusted {
 		m_loop = mallocT!Loop;
-		version (linux) m_uring = mallocT!UringEventLoop;
+		version (EventcoreEpollUsesUring) m_uring = mallocT!UringCore;
 		m_sockets = mallocT!SocketsDriver(m_loop);
 		m_events = mallocT!EventsDriver(m_loop, m_sockets);
 		m_signals = mallocT!SignalsDriver(m_loop);
 		m_timers = mallocT!TimerDriver;
 		m_pipes = mallocT!PipeDriver(m_loop);
 		m_processes = mallocT!ProcessDriver(m_loop, this);
-		m_core = mallocT!CoreDriver(m_loop, m_timers, m_events, m_processes, m_uring);
 		m_dns = mallocT!DNSDriver(m_events, m_signals);
-		version (linux) m_files = mallocT!FileDriver(m_uring);
+		m_core = mallocT!CoreDriver(m_loop, m_timers, m_events, m_processes, m_uring);
+
+		version (EventcoreEpollUsesUring) m_files = mallocT!FileDriver(m_uring);
 		else m_files = mallocT!FileDriver(m_events);
+
 		m_watchers = mallocT!WatcherDriver(m_events);
 	}
 
@@ -166,7 +175,8 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 }
 
 
-final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTimers, Events : EventDriverEvents, Processes : EventDriverProcesses) : EventDriverCore {
+final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTimers, Events : EventDriverEvents, Processes : EventDriverProcesses, Uring)
+	: EventDriverCore {
 @safe nothrow:
 	import core.atomic : atomicLoad, atomicStore;
 	import core.sync.mutex : Mutex;
@@ -183,7 +193,7 @@ final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTime
 		Timers m_timers;
 		Events m_events;
 		Processes m_processes;
-		UringEventLoop m_uring;
+		Uring m_uring;
 		bool m_exit = false;
 		EventID m_wakeupEvent;
 
@@ -192,7 +202,7 @@ final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTime
 	}
 
 	this(Loop loop, Timers timers, Events events, Processes processes,
-		UringEventLoop uring)
+		Uring uring)
 	@nogc {
 		m_loop = loop;
 		m_timers = timers;
@@ -235,7 +245,7 @@ final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTime
 		if (!waiterCount) {
 			return ExitReason.outOfWaiters;
 		}
-		version (linux) {
+		version (EventcoreEpollUsesUring) {
 			// this is required to make the kernel aware of
 			// submitted SEQ, otherwise the first call to
 			// process events could stall
@@ -245,7 +255,7 @@ final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTime
 		if (timeout <= 0.seconds) {
 			got_events = m_loop.doProcessEvents(0.seconds);
 			m_timers.process(MonoTime.currTime);
-			version (linux) got_events |= m_uring.doProcessEvents(0.seconds);
+			version (EventcoreEpollUsesUring) got_events |= m_uring.doProcessEvents(0.seconds);
 		} else {
 			auto now = MonoTime.currTime;
 			do {
@@ -254,7 +264,7 @@ final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTime
 				auto prev_step = now;
 				now = MonoTime.currTime;
 				got_events |= m_timers.process(now);
-				version(linux) got_events |= m_uring.doProcessEvents(0.seconds);
+				version(EventcoreEpollUsesUring) got_events |= m_uring.doProcessEvents(0.seconds);
 				if (timeout != Duration.max)
 					timeout -= now - prev_step;
 			} while (timeout > 0.seconds && !m_exit && !got_events);
