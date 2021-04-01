@@ -34,9 +34,7 @@ static if (!is(NativeEventDriver == EventDriver)) {
 	static this()
 	{
 		if (!s_isMainThread) {
-			if (!s_initCount++) {
-				assert(s_driver is null);
-			}
+			s_initCount++;
 		}
 	}
 

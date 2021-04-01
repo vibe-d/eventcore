@@ -334,7 +334,7 @@ package class PosixEventLoop {
 
 	protected @property int maxFD() const { return cast(int)m_fds.length; }
 
-	protected abstract void dispose();
+	protected void dispose() @nogc { destroy(m_fds); }
 
 	/** Waits for and processes a single batch of events.
 

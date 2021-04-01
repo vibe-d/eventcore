@@ -72,6 +72,7 @@ final class EpollEventLoop : PosixEventLoop {
 	override void dispose()
 	@nogc {
 		import core.sys.posix.unistd : close;
+		super.dispose();
 		close(m_epoll);
 	}
 
