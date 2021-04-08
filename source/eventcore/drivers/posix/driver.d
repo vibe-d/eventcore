@@ -117,18 +117,15 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 			return thname.length ? thname : "unknown";
 		}
 
-		string leaking_handle_desc;
+		bool hasPrintedHeader;
 		foreach (id, ref s; m_loop.m_fds) {
 			if (!s.specific.hasType!(typeof(null)) && !(s.common.flags & FDFlags.internal) &&
 			   (!s.specific.hasType!(StreamSocketSlot) || s.streamSocket.state == ConnectionState.connected))
-					try {
-						leaking_handle_desc ~= format!"   FD %s (%s)\n"(id, s.specific.kind);
-					} catch (Exception ex) { print("exception happened in Driver.dispose() during formatting"); }
-		}
-
-		if (leaking_handle_desc.length) {
-			print("Warning (thread: %s): leaking eventcore driver because there are still active handles", getThreadName());
-			print(leaking_handle_desc);
+			{
+				if (!hasPrintedHeader && (hasPrintedHeader = true) == true)
+					print("Warning (thread: %s): leaking eventcore driver because there are still active handles", getThreadName());
+				print("	  FD %s (%s)", id, s.specific.kind);
+            }
 		}
 
 		if (m_loop.m_handleCount > 0)
