@@ -124,8 +124,16 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 			{
 				if (!hasPrintedHeader && (hasPrintedHeader = true) == true)
 					print("Warning (thread: %s): leaking eventcore driver because there are still active handles", getThreadName());
-				print("	  FD %s (%s)", id, s.specific.kind);
-            }
+				print("  FD %s (%s)", id, s.specific.kind);
+				debug (EventCoreLeakTrace)
+				{
+					import std.array : replace;
+					string origin_str = s.common.origin.toString();
+					print("    Created by;\n      %s",
+						origin_str.replace("\n","\n      "));
+				}
+				else
+					print("Use '-debug=EventCoreLeakTrace' to show where the instantiation happened");            }
 		}
 
 		if (m_loop.m_handleCount > 0)
@@ -394,6 +402,11 @@ package class PosixEventLoop {
 			assert(specific.kind == typeof(specific).Kind.none, "Initializing slot that has not been cleared.");
 			common.refCount = 1;
 			common.flags = flags;
+			debug (EventCoreLeakTrace)
+			{
+				import core.runtime : defaultTraceHandler;
+				common.origin = defaultTraceHandler(null);
+			}
 			specific = slot_init;
 			vc = common.validationCounter;
 		}
@@ -455,6 +468,8 @@ private struct FDSlot {
 
 	DataInitializer userDataDestructor;
 	ubyte[16*size_t.sizeof] userData;
+	debug (EventCoreLeakTrace)
+		Throwable.TraceInfo origin;
 
 	@property EventMask eventMask() const nothrow {
 		EventMask ret = cast(EventMask)0;
