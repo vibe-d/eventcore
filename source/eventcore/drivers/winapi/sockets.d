@@ -106,6 +106,9 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 			connectCallback = null;
 			m_core.removeWaiter();
 		}
+
+		clearSocketSlot(sock);
+		invalidateSocket();
 	}
 
 	override StreamSocketFD adoptStream(int socket)

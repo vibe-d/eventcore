@@ -173,6 +173,10 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 			connectCallback = null;
 			m_loop.setNotifyCallback!(EventType.write)(sock, null);
 		}
+
+		m_loop.unregisterFD(sock, EventMask.read|EventMask.write);
+		m_loop.clearFD!StreamSocketSlot(sock);
+		closeSocket(cast(sock_t)sock);
 	}
 
 	final override StreamSocketFD adoptStream(int socket)
