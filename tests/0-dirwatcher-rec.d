@@ -76,7 +76,7 @@ void main()
 	assert(er == ExitReason.outOfWaiters);
 }
 
-void testCallback(WatcherID w, in ref FileChange ch)
+void testCallback(WatcherID w, ref const FileChange ch)
 @safe nothrow {
 	assert(w == watcher, "Wrong watcher generated a change");
 	pendingChanges ~= ch;
