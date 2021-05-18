@@ -119,21 +119,26 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 
 		bool hasPrintedHeader;
 		foreach (id, ref s; m_loop.m_fds) {
-			if (!s.specific.hasType!(typeof(null)) && !(s.common.flags & FDFlags.internal) &&
-			   (!s.specific.hasType!(StreamSocketSlot) || s.streamSocket.state == ConnectionState.connected))
+			if (!s.specific.hasType!(typeof(null)) && !(s.common.flags & FDFlags.internal)
+				&& (!s.specific.hasType!(StreamSocketSlot) || s.streamSocket.state == ConnectionState.connected))
 			{
-				if (!hasPrintedHeader && (hasPrintedHeader = true) == true)
+				if (!hasPrintedHeader) {
 					print("Warning (thread: %s): leaking eventcore driver because there are still active handles", getThreadName());
+					hasPrintedHeader = true;
+				}
 				print("  FD %s (%s)", id, s.specific.kind);
-				debug (EventCoreLeakTrace)
-				{
+				debug (EventCoreLeakTrace) {
 					import std.array : replace;
 					string origin_str = s.common.origin.toString();
 					print("    Created by;\n      %s",
 						origin_str.replace("\n","\n      "));
 				}
-				else
-					print("Use '-debug=EventCoreLeakTrace' to show where the instantiation happened");            }
+			}
+		}
+		debug (EventCoreLeakTrace) {}
+		else {
+			if (hasPrintedHeader)
+					print("Use '-debug=EventCoreLeakTrace' to show where the instantiation happened");
 		}
 
 		if (m_loop.m_handleCount > 0)
