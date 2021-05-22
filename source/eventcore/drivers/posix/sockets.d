@@ -96,6 +96,11 @@ version (Windows) {
 	extern (C) int close(int fd) nothrow @safe;
 }
 
+version (Android) {
+	static if (!is(typeof(MSG_NOSIGNAL)))
+		enum MSG_NOSIGNAL = 0x4000;
+}
+
 version (Posix) {
 	version (OSX) {
 		enum SEND_FLAGS = 0;
@@ -799,7 +804,13 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 				auto addr = () @trusted { return cast(sockaddr_in6*)multicast_address.name; } ();
 				ipv6_mreq mreq;
 				mreq.ipv6mr_multiaddr = addr.sin6_addr;
-				mreq.ipv6mr_interface = htonl(interface_index);
+
+				version (Android) {
+					// ipv6mr_interface is defined as ipv6mr_ifindex on android
+					mreq.ipv6mr_ifindex = htonl(interface_index);
+				} else {
+					mreq.ipv6mr_interface = htonl(interface_index);
+				}
 				return () @trusted { return setsockopt(cast(sock_t)socket, IPPROTO_IP, IPV6_JOIN_GROUP, &mreq, ipv6_mreq.sizeof); } () == 0;
 		}
 	}

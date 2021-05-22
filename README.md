@@ -18,8 +18,8 @@ Supported drivers and operating systems
 
 Driver               | Linux   | Windows | macOS   | FreeBSD | Android | iOS
 ---------------------|---------|---------|---------|---------|---------|---------
-SelectEventDriver    | yes     | yes     | yes     | yes¹    | &mdash; | &mdash;
-EpollEventDriver     | yes     | &mdash; | &mdash; | &mdash; | &mdash; | &mdash;
+SelectEventDriver    | yes     | yes     | yes     | yes¹    | yes     | &mdash;
+EpollEventDriver     | yes     | &mdash; | &mdash; | &mdash; | yes     | &mdash;
 WinAPIEventDriver    | &mdash; | yes     | &mdash; | &mdash; | &mdash; | &mdash;
 KqueueEventDriver    | &mdash; | &mdash; | yes     | yes¹    | &mdash; | &mdash;
 LibasyncEventDriver  | &mdash;¹| &mdash;¹| &mdash;¹| &mdash;¹| &mdash; | &mdash;
