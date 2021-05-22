@@ -51,6 +51,13 @@ version (darwin) {
 	alias lseek64 = lseek;
 }
 
+version (Android) {
+	static if (!is(off64_t)) {
+		alias off64_t = long;
+		extern(C) off64_t lseek64(int, off64_t, int) @safe nothrow;
+	}
+}
+
 private {
 	enum SEEK_SET = 0;
 	enum SEEK_CUR = 1;
