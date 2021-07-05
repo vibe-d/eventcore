@@ -511,7 +511,8 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 		m_core.removeWaiter();
 	}
 
-	final override DatagramSocketFD createDatagramSocket(scope Address bind_address, scope Address target_address)
+	final override DatagramSocketFD createDatagramSocket(scope Address bind_address,
+		scope Address target_address, DatagramCreateOptions options = DatagramCreateOptions.init)
 	{
 		auto fd = () @trusted { return WSASocketW(bind_address.addressFamily, SOCK_DGRAM, IPPROTO_UDP, null, 0, WSA_FLAG_OVERLAPPED); } ();
 		if (fd == INVALID_SOCKET)
@@ -520,6 +521,12 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 		void invalidateSocket() @nogc @trusted nothrow { closesocket(fd); fd = INVALID_SOCKET; }
 
 		() @trusted {
+			int tmp_reuse = 1;
+			if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &tmp_reuse, tmp_reuse.sizeof) != 0) {
+				invalidateSocket();
+				return;
+			}
+
 			if (bind(fd, bind_address.name, bind_address.nameLen) != 0) {
 				invalidateSocket();
 				return;
