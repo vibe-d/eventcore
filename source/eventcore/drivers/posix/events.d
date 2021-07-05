@@ -74,7 +74,7 @@ final class PosixEventDriverEvents(Loop : PosixEventLoop, Sockets : EventDriverS
 				// fake missing socketpair support on Windows
 				import std.socket : InternetAddress;
 				scope addr = new InternetAddress(0x7F000001, 0);
-				auto s = m_sockets.createDatagramSocketInternal(addr, null, true);
+				auto s = m_sockets.createDatagramSocketInternal(addr, null, DatagramCreateOptions.none, true);
 				if (s == DatagramSocketFD.invalid) return EventID.invalid;
 				fd[0] = cast(sock_t)s;
 				if (!() @trusted {

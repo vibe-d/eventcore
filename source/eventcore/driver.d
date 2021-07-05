@@ -327,7 +327,9 @@ interface EventDriverSockets {
 			Returns a datagram socket handle if the socket was created
 			successfully. Otherwise returns `DatagramSocketFD.invalid`.
 	*/
-	DatagramSocketFD createDatagramSocket(scope Address bind_address, scope Address target_address);
+	DatagramSocketFD createDatagramSocket(scope Address bind_address,
+		scope Address target_address,
+		DatagramCreateOptions options = DatagramCreateOptions.init);
 
 	/** Adopts an existing datagram socket.
 
@@ -1083,6 +1085,14 @@ enum StreamListenOptions {
 enum StreamSocketOption {
 	noDelay,
 	keepAlive
+}
+
+enum DatagramCreateOptions {
+	none = 0,
+	/// Applies the `SO_REUSEPORT` flag
+	reusePort = 1<<0,
+	/// Avoids applying the `SO_REUSEADDR` flag
+	reuseAddress = 1<<1,
 }
 
 enum DatagramSocketOption {

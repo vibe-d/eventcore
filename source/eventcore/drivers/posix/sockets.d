@@ -703,16 +703,42 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 		m_loop.m_fds[socket].streamSocket.state = shut_read ? shut_write ? ConnectionState.closed : ConnectionState.passiveClose : shut_write ? ConnectionState.activeClose : ConnectionState.connected;
 	}
 
-	final override DatagramSocketFD createDatagramSocket(scope Address bind_address, scope Address target_address)
+	final override DatagramSocketFD createDatagramSocket(scope Address bind_address,
+		scope Address target_address, DatagramCreateOptions options = DatagramCreateOptions.init)
 	{
-		return createDatagramSocketInternal(bind_address, target_address, false);
+		return createDatagramSocketInternal(bind_address, target_address, options, false);
 	}
 
-	package DatagramSocketFD createDatagramSocketInternal(scope Address bind_address, scope Address target_address, bool is_internal = true)
+	package DatagramSocketFD createDatagramSocketInternal(scope Address bind_address,
+		scope Address target_address, DatagramCreateOptions options = DatagramCreateOptions.init,
+		bool is_internal = true)
 	{
 		// @trusted to escape DIP1000's `scope` check
 		auto sockfd = () @trusted { return createSocket(bind_address.addressFamily, SOCK_DGRAM); }();
 		if (sockfd == -1) return DatagramSocketFD.invalid;
+
+		auto optsucc = () @trusted {
+			int tmp_reuse = 1;
+			// FIXME: error handling!
+			if (options & DatagramCreateOptions.reuseAddress) {
+				if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &tmp_reuse, tmp_reuse.sizeof) != 0)
+					return false;
+			}
+
+			version (Windows) {}
+			else {
+				if ((options & DatagramCreateOptions.reusePort) && setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, &tmp_reuse, tmp_reuse.sizeof) != 0)
+					return false;
+			}
+
+			return true;
+		} ();
+
+		if (!optsucc) {
+			closeSocket(sockfd);
+			return DatagramSocketFD.init;
+		}
+
 
 		if (bind_address && () @trusted { return bind(sockfd, bind_address.name, bind_address.nameLen); } () != 0) {
 			closeSocket(sockfd);
