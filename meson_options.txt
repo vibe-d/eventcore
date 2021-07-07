@@ -1,0 +1,8 @@
+option('driver', 
+    type: 'combo', 
+    choices: ['epoll', 'cfrunloop', 'kqueue', 'winapi', 'select', 'libasync', 'generic', 'auto'], 
+    value: 'auto',
+    description: 'Which async backend driver to use',
+    yield: true
+)
+option('use_gaia', type: 'feature', value: 'auto')
