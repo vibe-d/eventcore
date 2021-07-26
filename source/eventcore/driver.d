@@ -323,7 +323,8 @@ interface EventDriverSockets {
 				specified and the target address parameter of `send` is
 				left to `null`, it will be used instead.
 			options = Optional options for datagram creation. If unset,
-				'DatagramCreateOptions.init' is used.
+				`DatagramCreateOptions.init` is used.
+
 		Returns:
 			Returns a datagram socket handle if the socket was created
 			successfully. Otherwise returns `DatagramSocketFD.invalid`.
