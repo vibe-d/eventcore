@@ -2,6 +2,7 @@ eventcore_src = [
 	'core.d',
 	'driver.d',
 	'drivers/libasync.d',
+	'drivers/posix/cfrunloop.d',
 	'drivers/posix/dns.d',
 	'drivers/posix/driver.d',
 	'drivers/posix/epoll.d',
@@ -26,11 +27,12 @@ eventcore_src = [
 	'drivers/winapi/sockets.d',
 	'drivers/winapi/watchers.d',
 	'internal/consumablequeue.d',
+	'internal/corefoundation.d',
 	'internal/dlist.d',
+	'internal/ioworker.d',
 	'internal/utils.d',
 	'internal/win32.d',
 	'socket.d',
-
 ]
 
 eventcore_lib = library(
@@ -39,7 +41,8 @@ eventcore_lib = library(
 	version: project_version,
 	install: true,
 	include_directories: include_directories('../'),
-	dependencies: taggedalgebraic_dep,
+	dependencies: [taggedalgebraic_dep, eventcore_extra_deps],
+	d_module_versions: eventcore_build_versions
 )
 
 pkgc = import('pkgconfig')
@@ -47,11 +50,33 @@ pkgc = import('pkgconfig')
 pkgc.generate(
 	eventcore_lib,
 	subdirs: 'd/eventcore',
+	d_module_versions: eventcore_build_versions
 )
 
-install_headers(
-	eventcore_src,
-	subdir: 'd/eventcore/eventcore',
+# This is using install_subdir instead of install_headers, since
+# install_headers flattens the headers directory, it turns
+# ├ ...
+# ├ driver.d
+# ├ drivers
+# │  ├ libasync.d
+# │  ├ ...
+# │  └ winapi
+# │    └ ...
+# ├ ...
+# └ socket.d
+# 
+# into
+# 
+# ├ ...
+# ├ drivers.d
+# ├ libasync.d
+# ├ ...
+# └ socket.d
+# 
+
+install_subdir(
+	'../',
+	install_dir: 'include/d/eventcore/eventcore',
 )
 
 test_exe = executable(
@@ -59,7 +84,8 @@ test_exe = executable(
 	eventcore_src,
 	include_directories: include_directories('../'),
 	d_unittest: true,
-	d_args: '-main',
+	d_args: meson.get_compiler('d').unittest_args(),
+	link_args: '-main',
 	dependencies: taggedalgebraic_dep,
 )
 
