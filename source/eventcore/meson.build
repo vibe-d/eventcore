@@ -1,4 +1,4 @@
-eventcore_src = [
+sources = files(
 	'core.d',
 	'driver.d',
 	'drivers/libasync.d',
@@ -33,60 +33,4 @@ eventcore_src = [
 	'internal/utils.d',
 	'internal/win32.d',
 	'socket.d',
-]
-
-eventcore_lib = library(
-	'eventcore',
-	eventcore_src,
-	version: project_version,
-	install: true,
-	include_directories: include_directories('../'),
-	dependencies: [taggedalgebraic_dep, eventcore_extra_deps],
-	d_module_versions: eventcore_build_versions
 )
-
-pkgc = import('pkgconfig')
-
-pkgc.generate(
-	eventcore_lib,
-	subdirs: 'd/eventcore',
-	d_module_versions: eventcore_build_versions
-)
-
-# This is using install_subdir instead of install_headers, since
-# install_headers flattens the headers directory, it turns
-# ├ ...
-# ├ driver.d
-# ├ drivers
-# │  ├ libasync.d
-# │  ├ ...
-# │  └ winapi
-# │    └ ...
-# ├ ...
-# └ socket.d
-# 
-# into
-# 
-# ├ ...
-# ├ drivers.d
-# ├ libasync.d
-# ├ ...
-# └ socket.d
-# 
-
-install_subdir(
-	'../',
-	install_dir: 'include/d/eventcore/eventcore',
-)
-
-test_exe = executable(
-	'eventcore_test',
-	eventcore_src,
-	include_directories: include_directories('../'),
-	d_unittest: true,
-	d_args: meson.get_compiler('d').unittest_args(),
-	link_args: '-main',
-	dependencies: taggedalgebraic_dep,
-)
-
-test('test_eventcore', test_exe)

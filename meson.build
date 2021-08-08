@@ -1,14 +1,10 @@
-project('eventcore', 'd',
-	meson_version: '>=0.53',
+project(
+	'eventcore',
+	'd',
 	version: '0.9.13',
+	license: 'BSL-1.0',
+	meson_version: '>=0.53',
 )
-
-project_soversion      = '0'
-project_version_suffix = ''
-project_version        = meson.project_version()
-project_version_full   = project_version + project_version_suffix
-
-taggedalgebraic_dep = dependency('taggedalgebraic', version: ['>=0.10.12', '<0.12'])
 
 eventcore_build_versions = []
 eventcore_extra_deps = []
@@ -108,12 +104,55 @@ summary(
 	bool_yn: true
 )
 	
-
-source_root = meson.source_root()
-build_root = meson.build_root()
 subdir('source/eventcore')
 
 eventcore_dep = declare_dependency(
 	include_directories: include_directories('source'),
-	link_with: eventcore_lib
+	sources: sources,
+)
+
+taggedalgebraic_dep = subproject('taggedalgebraic').get_variable('library_dep')
+
+eventcore_lib = library(
+	'eventcore',
+	dependencies: [eventcore_dep, taggedalgebraic_dep, eventcore_extra_deps],
+	version: meson.project_version(),
+	install: true,
+	d_module_versions: eventcore_build_versions
+)
+
+test_exe = executable(
+	'eventcore_test',
+	dependencies: [eventcore_dep, taggedalgebraic_dep],
+	d_unittest: true,
+	d_args: meson.get_compiler('d').unittest_args(),
+	link_args: '-main',
+)
+
+test('test_eventcore', test_exe)
+
+# This is using install_subdir instead of install_headers, since
+# install_headers flattens the headers directory, it turns
+# ├ ...
+# ├ driver.d
+# ├ drivers
+# │  ├ libasync.d
+# │  ├ ...
+# │  └ winapi
+# │    └ ...
+# ├ ...
+# └ socket.d
+#
+# into
+#
+# ├ ...
+# ├ drivers.d
+# ├ libasync.d
+# ├ ...
+# └ socket.d
+#
+
+install_subdir(
+	'../',
+	install_dir: 'include/d/eventcore/eventcore',
 )
