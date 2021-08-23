@@ -45,27 +45,43 @@ final class CFRunLoopEventLoop : KqueueEventLoopBase {
 		auto kres = doProcessEventsBase(0.seconds);
 		if (kres) timeout = 0.seconds;
 
-		// NOTE: the timeout per CFRunLoopRunInMode call is limited to one
-		//       second to work around the issue that the kqueue CFFileDescriptor
+		// NOTE: the timeout per CFRunLoopRunInMode call is limited to five
+		//       seconds to work around the issue that the kqueue CFFileDescriptor
 		//       sometimes does not fire. There seems to be some kind of race-
 		//       condition, between the edge-triggered kqueue events and
 		//       CFFileDescriptorEnableCallBacks/CFRunLoopRunInMode.
 		//
 		//       Even changing the order of calls in processKqueue to first
 		//       re-enable the callbacks and *then* process the already pending
-		//       events does not help (and is also eplicitly discouraged in
+		//       events does not help (and is also explicitly discouraged in
 		//       Apple's documentation).
-		while (timeout > 0.seconds) {
+		//
+		// NOTE: In contrast to Apple's documentation, kCFRunLoopRunStopped is
+		//       returned not only if the loop is explicitly stopped, but also
+		//       after handling events normally. For this reason we treat any
+		//       return value other than "timed out" as having processed an event.
+		if (timeout == 0.seconds) {
+			while (true) {
+				auto res = CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
+				if (res == CFRunLoopRunResult.kCFRunLoopRunTimedOut)
+					break;
+				else kres = true;
+			}
+
+			CFFileDescriptorEnableCallBacks(m_kqueueDescriptor, CFOptionFlags.kCFFileDescriptorReadCallBack);
+			kres |= doProcessEventsBase(0.seconds);
+		} else while (timeout > 0.seconds) {
 			auto tol = min(timeout, 5.seconds);
 			timeout -= tol;
 			CFTimeInterval to = 1e-7 * tol.total!"hnsecs";
 			auto res = CFRunLoopRunInMode(kCFRunLoopDefaultMode, to, true);
 			if (res != CFRunLoopRunResult.kCFRunLoopRunTimedOut) {
-				return kres || res == CFRunLoopRunResult.kCFRunLoopRunHandledSource;
+				kres = true;
+				break;
 			}
 
 			CFFileDescriptorEnableCallBacks(m_kqueueDescriptor, CFOptionFlags.kCFFileDescriptorReadCallBack);
-			kres = doProcessEventsBase(0.seconds);
+			kres |= doProcessEventsBase(0.seconds);
 			if (kres) break;
 		}
 
