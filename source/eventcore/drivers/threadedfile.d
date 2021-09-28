@@ -193,9 +193,7 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents) : EventDriverFil
 		}
 
 		// TODO: close may block and should be executed in a worker thread
-		int res;
-		do res = .close(cast(int)file.value);
-		while (res != 0 && errno == EINTR);
+		int res = .close(cast(int)file.value);
 
 		m_files[file.value] = FileInfo.init;
 

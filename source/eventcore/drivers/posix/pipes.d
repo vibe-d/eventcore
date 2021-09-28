@@ -10,7 +10,7 @@ import std.algorithm : min, max;
 
 final class PosixEventDriverPipes(Loop : PosixEventLoop) : EventDriverPipes {
 @safe: /*@nogc:*/ nothrow:
-	import core.stdc.errno : errno, EAGAIN, EINTR;
+	import core.stdc.errno : errno, EAGAIN;
 	import core.sys.posix.unistd : close, read, write;
 	import core.sys.posix.fcntl;
 	import core.sys.posix.poll;
@@ -311,9 +311,7 @@ final class PosixEventDriverPipes(Loop : PosixEventLoop) : EventDriverPipes {
 			return;
 		}
 
-		int res;
-		do res = close(cast(int)pipe);
-		while (res != 0 && errno == EINTR);
+		int res = close(cast(int)pipe);
 		m_loop.unregisterFD(pipe, EventMask.read|EventMask.write|EventMask.status);
 		m_loop.clearFD!PipeSlot(pipe);
 
