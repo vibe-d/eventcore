@@ -26,7 +26,7 @@ void main()
 			auto dur = MonoTime.currTime() - s_startTime;
 
 			assert(dur >= 1200.msecs, (dur - 1200.msecs).toString());
-			assert(dur < 1300.msecs, (dur - 1200.msecs).toString());
+			assert(dur < 1300.msecs + 100.msecs, (dur - 1200.msecs).toString());
 
 			timer1fired = true;
 		} catch (Exception e) {

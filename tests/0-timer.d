@@ -27,7 +27,7 @@ void main()
 
 		try {
 			assert(dur > 1200.msecs - 2.msecs, (dur - 1200.msecs).toString());
-			assert(dur < 1300.msecs, (dur - 1200.msecs).toString());
+			assert(dur < 1300.msecs + 100.msecs, (dur - 1200.msecs).toString());
 		} catch (Exception e) assert(false, e.msg);
 
 		s_startTime += dur;
