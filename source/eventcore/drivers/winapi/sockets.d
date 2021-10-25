@@ -283,6 +283,10 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 					on_read_finish(socket, IOStatus.wouldBlock, 0);
 					return;
 				}
+			} else if (err == WSAEWOULDBLOCK && mode == IOMode.immediate) {
+				resetBuffers();
+				on_read_finish(socket, IOStatus.wouldBlock, 0);
+				return;
 			} else {
 				resetBuffers();
 				auto st = handleReadError(err, *slot);
