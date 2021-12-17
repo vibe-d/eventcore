@@ -224,7 +224,14 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents) : EventDriverFil
 		version (Posix) {
 			// FIXME: do this in the thread pool
 
-			if (ftruncate(cast(int)file, size) != 0) {
+			static if (off_t.max < ulong.max) {
+				if (size > off_t.max) {
+					on_finish(file, IOStatus.error, 0);
+					return;
+				}
+			}
+
+			if (ftruncate(cast(int)file, cast(off_t)size) != 0) {
 				on_finish(file, IOStatus.error, 0);
 				return;
 			}
