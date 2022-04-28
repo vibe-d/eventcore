@@ -268,9 +268,13 @@ final class WinAPIEventDriverCore : EventDriverCore {
 	}
 
 	package void discardEvents(scope OVERLAPPED_CORE*[] overlapped...)
-@nogc	{
-		import std.algorithm.searching : canFind;
-		m_ioEvents.filterPending!(evt => !overlapped.canFind(evt.overlapped));
+	@nogc {
+		m_ioEvents.filterPending!((evt) @safe {
+			foreach (ovl; overlapped)
+				if (ovl is evt.overlapped)
+					return false;
+				return true;
+			});
 	}
 
 	private void executeThreadCallbacks()

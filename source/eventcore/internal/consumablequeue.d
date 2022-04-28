@@ -177,7 +177,7 @@ final class ConsumableQueue(T)
 		m_first = m_first & m_capacityMask;
 	}
 
-	private ref T getPendingAt(size_t idx)
+	private scope ref T getPendingAt(size_t idx)
 	{
 		assert(idx < m_pendingCount, "Pending item index out of bounds.");
 		return m_storage[(m_first + m_consumedCount + idx) & m_capacityMask].value;
@@ -251,7 +251,7 @@ unittest {
 
 
 void filterPending(alias pred, T)(ConsumableQueue!T q)
-{
+@safe {
 	size_t ir = 0;
 	size_t iw = 0;
 

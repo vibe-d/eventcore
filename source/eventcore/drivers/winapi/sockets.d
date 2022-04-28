@@ -600,7 +600,7 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 
 		if (!isValid(socket)) return false;
 
-		switch (multicast_address.addressFamily) {
+		switch (() @trusted { return multicast_address.addressFamily; } ()) { // DIP-1000: addressFamily's this is not considered scope
 			default: assert(false, "Multicast only supported for IPv4/IPv6 sockets.");
 			case AddressFamily.INET:
 				struct ip_mreq {

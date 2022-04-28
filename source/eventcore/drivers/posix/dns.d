@@ -398,7 +398,7 @@ final class EventDriverDNS_GHBN(Events : EventDriverEvents, Signals : EventDrive
 				scope addr = new RefAddress(() @trusted { return cast(sockaddr*)&sa; } (), sa.sizeof);
 				RefAddress[1] aa;
 				aa[0] = addr;
-				on_lookup_finished(handle, DNSStatus.ok, aa);
+				on_lookup_finished(handle, DNSStatus.ok, () @trusted { return aa[]; } ()); // NOTE DIP-1000 doesn't allow this, even if the parameter is scope
 			} break;
 			case AF_INET6: {
 				sockaddr_in6 sa;
@@ -407,7 +407,7 @@ final class EventDriverDNS_GHBN(Events : EventDriverEvents, Signals : EventDrive
 				scope addr = new RefAddress(() @trusted { return cast(sockaddr*)&sa; } (), sa.sizeof);
 				RefAddress[1] aa;
 				aa[0] = addr;
-				on_lookup_finished(handle, DNSStatus.ok, aa);
+				on_lookup_finished(handle, DNSStatus.ok, () @trusted { return aa[]; } ()); // NOTE DIP-1000 doesn't allow this, even if the parameter is scope
 			} break;
 		}
 
