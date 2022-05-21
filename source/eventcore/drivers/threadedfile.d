@@ -405,7 +405,13 @@ log("start processing");
 		auto bytes = buffer;
 		version (Windows) {
 			._lseeki64(cast(int)file, offset, SEEK_SET);
-		} else .lseek64(cast(int)file, offset, SEEK_SET);
+		} else version (linux) {
+			.lseek64(cast(int)file, offset, SEEK_SET);
+		} else version (OSX) {
+			.lseek64(cast(int)file, offset, SEEK_SET);
+		} else {
+			.lseek(cast(int)file, offset, SEEK_SET);
+		}
 
 		scope (exit) {
 log("trigger event");
