@@ -310,8 +310,8 @@ private struct HandleSlot {
 
 	@safe nothrow:
 
-	@property ref FileSlot file() { return specific.get!FileSlot; }
-	@property ref WatcherSlot watcher() { return specific.get!WatcherSlot; }
+	@property ref FileSlot file() return { return specific.get!FileSlot; }
+	@property ref WatcherSlot watcher() return { return specific.get!WatcherSlot; }
 
 	void addRef()
 	{
