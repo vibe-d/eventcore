@@ -12,6 +12,8 @@ fi
 
 dub test --arch=$ARCH --compiler=$DC -c $CONFIG
 
+dub test --arch=$ARCH --compiler=$DC -c $CONFIG -b unittest-dip1000
+
 if [ ${BUILD_EXAMPLE=1} -eq 1 ]; then
     for ex in $(\ls -1 examples/*.d); do
         echo "[INFO] Building example $ex"

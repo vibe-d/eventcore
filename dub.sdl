@@ -52,3 +52,8 @@ configuration "libasync" {
 configuration "generic" {
 	// Defines eventDriver as the generic EventDriver interface. Setup must be done manually.
 }
+
+buildType "unittest-dip1000" {
+	buildOptions "unittests" "debugMode" "debugInfo"
+	dflags "-preview=dip1000"
+}
