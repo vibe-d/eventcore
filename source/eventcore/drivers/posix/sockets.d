@@ -33,6 +33,7 @@ version (Posix) {
 		else version (NetBSD) enum O_CLOEXEC = 0x400000;
 		else version (OpenBSD) enum O_CLOEXEC = 0x10000;
 		else version (OSX) enum O_CLOEXEC = 0x1000000;
+		else version (iOS) enum O_CLOEXEC = 0x1000000;
 	}
 }
 version (linux) {
@@ -60,7 +61,10 @@ version (linux) {
 }
 version (OSX) {
     import core.sys.darwin.netinet.in_ : IP_ADD_MEMBERSHIP, IP_MULTICAST_LOOP;
-
+	static if (!is(typeof(ESHUTDOWN))) enum ESHUTDOWN = 58;
+}
+version (iOS) {
+    import core.sys.darwin.netinet.in_ : IP_ADD_MEMBERSHIP, IP_MULTICAST_LOOP;
 	static if (!is(typeof(ESHUTDOWN))) enum ESHUTDOWN = 58;
 }
 version (FreeBSD) {
@@ -103,6 +107,8 @@ version (Android) {
 
 version (Posix) {
 	version (OSX) {
+		enum SEND_FLAGS = 0;
+	} else version (iOS) {
 		enum SEND_FLAGS = 0;
 	} else {
 		enum SEND_FLAGS = MSG_NOSIGNAL;

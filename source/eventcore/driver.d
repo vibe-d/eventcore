@@ -18,7 +18,14 @@
 module eventcore.driver;
 
 import core.time : Duration;
-import std.process : StdProcessConfig = Config;
+version (iOS) {
+	enum StdProcessConfig {
+		none,
+		detached,
+		newEnv,
+		suppressConsole,
+	}
+} else import std.process : StdProcessConfig = Config;
 import std.socket : Address;
 import std.stdint : intptr_t;
 import std.typecons : Tuple;

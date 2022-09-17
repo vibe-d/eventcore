@@ -64,91 +64,95 @@ final class PosixEventDriverProcesses(Loop : PosixEventLoop) : EventDriverProces
 		string working_dir)
 	@trusted {
 		// Use std.process to spawn processes
-		import std.process : pipe, Pid, spawnProcess, StdProcessConfig = Config;
-		import std.stdio : File;
-		static import std.stdio;
-
-		static File fdToFile(int fd, scope const(char)[] mode)
-		{
-			try {
-				File f;
-				f.fdopen(fd, mode);
-				return f;
-			} catch (Exception e) {
-				assert(0);
-			}
-		}
-
-		try {
-			Process process;
-			File stdinFile, stdoutFile, stderrFile;
-
-			stdinFile = stdin.visit!(
-				(int handle) => fdToFile(handle, "r"),
-				(ProcessRedirect redirect) {
-					final switch (redirect) {
-					case ProcessRedirect.inherit: return std.stdio.stdin;
-					case ProcessRedirect.none: return File.init;
-					case ProcessRedirect.pipe:
-						auto p = pipe();
-						process.stdin = m_driver.pipes.adopt(dup(p.writeEnd.fileno));
-						return p.readEnd;
-					}
-				});
-
-			stdoutFile = stdout.visit!(
-				(int handle) => fdToFile(handle, "w"),
-				(ProcessRedirect redirect) {
-					final switch (redirect) {
-					case ProcessRedirect.inherit: return std.stdio.stdout;
-					case ProcessRedirect.none: return File.init;
-					case ProcessRedirect.pipe:
-						auto p = pipe();
-						process.stdout = m_driver.pipes.adopt(dup(p.readEnd.fileno));
-						return p.writeEnd;
-					}
-				},
-				(_) => File.init);
-
-			stderrFile = stderr.visit!(
-				(int handle) => fdToFile(handle, "w"),
-				(ProcessRedirect redirect) {
-					final switch (redirect) {
-					case ProcessRedirect.inherit: return std.stdio.stderr;
-					case ProcessRedirect.none: return File.init;
-					case ProcessRedirect.pipe:
-						auto p = pipe();
-						process.stderr = m_driver.pipes.adopt(dup(p.readEnd.fileno));
-						return p.writeEnd;
-					}
-				},
-				(_) => File.init);
-
-			const redirectStdout = stdout.convertsTo!ProcessStdoutRedirect;
-			const redirectStderr = stderr.convertsTo!ProcessStderrRedirect;
-
-			if (redirectStdout) {
-				assert(!redirectStderr, "Can't redirect both stdout and stderr");
-
-				stdoutFile = stderrFile;
-			} else if (redirectStderr) {
-				stderrFile = stdoutFile;
-			}
-
-			Pid stdPid = spawnProcess(
-				args,
-				stdinFile,
-				stdoutFile,
-				stderrFile,
-				env,
-				cast(StdProcessConfig)config,
-				working_dir);
-			process.pid = adopt(stdPid.osHandle);
-			stdPid.destroy();
-
-			return process;
-		} catch (Exception e) {
+		version (iOS) {
 			return Process.init;
+		} else {
+			import std.process : pipe, Pid, spawnProcess, StdProcessConfig = Config;
+			import std.stdio : File;
+			static import std.stdio;
+
+			static File fdToFile(int fd, scope const(char)[] mode)
+			{
+				try {
+					File f;
+					f.fdopen(fd, mode);
+					return f;
+				} catch (Exception e) {
+					assert(0);
+				}
+			}
+
+			try {
+				Process process;
+				File stdinFile, stdoutFile, stderrFile;
+
+				stdinFile = stdin.visit!(
+					(int handle) => fdToFile(handle, "r"),
+					(ProcessRedirect redirect) {
+						final switch (redirect) {
+						case ProcessRedirect.inherit: return std.stdio.stdin;
+						case ProcessRedirect.none: return File.init;
+						case ProcessRedirect.pipe:
+							auto p = pipe();
+							process.stdin = m_driver.pipes.adopt(dup(p.writeEnd.fileno));
+							return p.readEnd;
+						}
+					});
+
+				stdoutFile = stdout.visit!(
+					(int handle) => fdToFile(handle, "w"),
+					(ProcessRedirect redirect) {
+						final switch (redirect) {
+						case ProcessRedirect.inherit: return std.stdio.stdout;
+						case ProcessRedirect.none: return File.init;
+						case ProcessRedirect.pipe:
+							auto p = pipe();
+							process.stdout = m_driver.pipes.adopt(dup(p.readEnd.fileno));
+							return p.writeEnd;
+						}
+					},
+					(_) => File.init);
+
+				stderrFile = stderr.visit!(
+					(int handle) => fdToFile(handle, "w"),
+					(ProcessRedirect redirect) {
+						final switch (redirect) {
+						case ProcessRedirect.inherit: return std.stdio.stderr;
+						case ProcessRedirect.none: return File.init;
+						case ProcessRedirect.pipe:
+							auto p = pipe();
+							process.stderr = m_driver.pipes.adopt(dup(p.readEnd.fileno));
+							return p.writeEnd;
+						}
+					},
+					(_) => File.init);
+
+				const redirectStdout = stdout.convertsTo!ProcessStdoutRedirect;
+				const redirectStderr = stderr.convertsTo!ProcessStderrRedirect;
+
+				if (redirectStdout) {
+					assert(!redirectStderr, "Can't redirect both stdout and stderr");
+
+					stdoutFile = stderrFile;
+				} else if (redirectStderr) {
+					stderrFile = stdoutFile;
+				}
+
+				Pid stdPid = spawnProcess(
+					args,
+					stdinFile,
+					stdoutFile,
+					stderrFile,
+					env,
+					cast(StdProcessConfig)config,
+					working_dir);
+				process.pid = adopt(stdPid.osHandle);
+				stdPid.destroy();
+
+				return process;
+			} catch (Exception e) {
+				return Process.init;
+			}
 		}
 	}
 
