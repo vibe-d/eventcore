@@ -33,7 +33,7 @@ final class WinAPIEventDriverDNS : EventDriverDNS {
 			scope addr = new RefAddress(() @trusted { return cast(sockaddr*)&sa; } (), addrlen);
 			RefAddress[1] addrs;
 			addrs[0] = addr;
-			on_lookup_finished(id, DNSStatus.ok, addrs);
+			on_lookup_finished(id, DNSStatus.ok, () @trusted { return addrs[]; } ()); // NOTE DIP-1000 doesn't allow this, even if the parameter is scope
 			return id;
 		}
 

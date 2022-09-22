@@ -171,18 +171,24 @@ final class PosixEventDriverEvents(Loop : PosixEventLoop, Sockets : EventDriverS
 			trigger(event, cnt > 0);
 		}
 	} else {
-		private void onSocketData(DatagramSocketFD s, IOStatus st, size_t, scope RefAddress)
+		private void onSocketData(DatagramSocketFD socket, IOStatus st, size_t, scope RefAddress)
 		@nogc {
 			// avoid infinite recursion in case of errors
 			if (st == IOStatus.ok)
-				m_sockets.receiveNoGC(s, m_buf, IOMode.once, &onSocketData);
+				m_sockets.receiveNoGC(socket, m_buf, IOMode.once, &onSocketData);
 
 			try {
-				EventID evt = m_sockets.userData!EventID(s);
-				scope doit = {
-					trigger(evt, (cast(long[])m_buf)[0] > 1);
-				}; // cast to nogc
-				() @trusted { (cast(void delegate() @nogc)doit)(); } ();
+				EventID evt = m_sockets.userData!EventID(socket);
+				// FIXME: push @nogc further down the call chain instead of
+				//        performing this ugly workaround
+				static struct S {
+					PosixEventDriverEvents this_;
+					EventID evt;
+					bool all;
+					void doit() { this_.trigger(evt, all); }
+				}
+				scope s = S(this, evt, (cast(long[])m_buf)[0] > 1);
+				() @trusted { (cast(void delegate() @nogc)&s.doit)(); } ();
 			} catch (Exception e) assert(false, e.msg);
 		}
 	}

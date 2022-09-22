@@ -8,13 +8,23 @@ import taggedalgebraic;
 void print(ARGS...)(string str, ARGS args)
 @trusted @nogc nothrow {
 	import std.format : formattedWrite;
-	StdoutRange r;
-	scope cb = () {
-		try (&r).formattedWrite(str, args);
-		catch (Exception e) assert(false, e.msg);
-	};
-	(cast(void delegate() @nogc @safe nothrow)cb)();
-	r.put('\n');
+	// NOTE: formattedWrite isn't @nogc, although it could be for the types that
+	//       we actually log. Since printing is only enabled in debug settings,
+	//       @nogc is artificailly enforced here to be able to provice a @nogc
+	//       API.
+	static struct S {
+		string str;
+		ARGS args;
+		StdoutRange r;
+		void doit()
+		{
+			try (&r).formattedWrite(str, args);
+			catch (Exception e) assert(false, e.msg);
+		}
+	}
+	scope s = S(str, args);
+	(cast(void delegate() @nogc @safe nothrow)&s.doit)();
+	s.r.put('\n');
 }
 
 T mallocT(T, ARGS...)(ARGS args)
@@ -75,10 +85,14 @@ void freeNT(T)(ref T[] arr)
 }
 
 private void noGCDestroy(T)(ref T t)
-@trusted {
+@trusted @nogc {
 	// FIXME: only do this if the destructor chain is actually nogc
-	scope doit = { destroy(t); };
-	(cast(void delegate() @nogc)doit)();
+	static struct S {
+		T* pt;
+		void doit() { destroy(*pt); }
+	}
+	scope s = S(&t);
+	(cast(void delegate() @nogc)&s.doit)();
 }
 
 private extern(C) Throwable.TraceInfo _d_traceContext(void* ptr = null);
@@ -94,15 +108,27 @@ void nogc_assert(bool cond, string message, string file = __FILE__, int line = _
 			assert(false);
 		}
 
-		scope doit = {
-			stderr.writefln("Assertion failure @%s(%s): %s", file, line, message);
-			stderr.writeln("------------------------");
-			if (auto info = _d_traceContext(null)) {
-				foreach (s; info)
-					stderr.writeln(s);
-			} else stderr.writeln("no stack trace available");
-		};
-		(cast(void delegate() @nogc)doit)(); // write and _d_traceContext are not nogc
+		// NOTE: writefln isn't @nogc, although it could be for the types that
+		//       we actually log. Since this is only called right before app
+		//       termination, enforcing @nogc is done here to allow keeping the
+		//       API @nogc.
+		static struct S {
+			string message;
+			string file;
+			int line;
+			void doit()
+			{
+				stderr.writefln("Assertion failure @%s(%s): %s", file, line, message);
+				stderr.writeln("------------------------");
+				if (auto info = _d_traceContext(null)) {
+					foreach (s; info)
+						stderr.writeln(s);
+				} else stderr.writeln("no stack trace available");
+			}
+
+		}
+		scope s = S(message, file, line);
+		(cast(void delegate() @nogc)&s.doit)(); // write and _d_traceContext are not nogc
 	}
 }
 

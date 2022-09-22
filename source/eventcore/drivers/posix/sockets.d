@@ -895,10 +895,19 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 
 	package void receiveNoGC(DatagramSocketFD socket, ubyte[] buffer, IOMode mode, void delegate(DatagramSocketFD, IOStatus, size_t, scope RefAddress) @safe nothrow @nogc on_receive_finish)
 	@trusted @nogc {
-		scope void delegate() @safe nothrow do_it = {
-			receive(socket, buffer, mode, on_receive_finish);
-		};
-		(cast(void delegate() @safe nothrow @nogc)do_it)();
+		// FIXME: push @nogc further down the call chain instead of
+		//        performing this ugly workaround
+		static struct S {
+			PosixEventDriverSockets this_;
+			DatagramSocketFD socket;
+			ubyte[] buffer;
+			IOMode mode;
+			void delegate(DatagramSocketFD, IOStatus, size_t, scope RefAddress) @safe nothrow @nogc on_receive_finish;
+			void doit() { this_.receive(socket, buffer, mode, on_receive_finish); }
+
+		}
+		scope s = S(this, socket, buffer, mode, on_receive_finish);
+		(cast(void delegate() @safe nothrow @nogc)&s.doit)();
 	}
 
 	void cancelReceive(DatagramSocketFD socket)
