@@ -263,6 +263,7 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 		}
 
 		auto slot = () @trusted { return &m_sockets[socket].streamSocket(); } ();
+		assert(!slot.read.callback);
 		slot.read.buffer = buffer;
 		slot.read.bytesTransferred = 0;
 		slot.read.mode = mode;
@@ -279,7 +280,9 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 			auto err = WSAGetLastError();
 			if (err == WSA_IO_PENDING) {
 				if (mode == IOMode.immediate) {
-					resetBuffers();
+					addRef(socket);
+					m_core.addWaiter();
+					() @trusted { CancelIoEx(cast(HANDLE)cast(SOCKET)socket, ovl); } ();
 					on_read_finish(socket, IOStatus.wouldBlock, 0);
 					return;
 				}
@@ -304,7 +307,11 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 	{
 		auto slot = () @trusted { return cast(SocketVector.FullField*)lpOverlapped.hEvent; } ();
 
-		if (!slot.streamSocket.read.callback) return;
+		if (!slot.streamSocket.read.callback) {
+			slot.common.core.removeWaiter();
+			slot.common.driver.releaseRef(cast(StreamSocketFD)slot.common.fd);
+			return;
+		}
 
 		void invokeCallback(IOStatus status, size_t nsent)
 		@safe nothrow {
@@ -382,6 +389,7 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 		}
 
 		auto slot = () @trusted { return &m_sockets[socket].streamSocket(); } ();
+		assert(!slot.write.callback);
 		slot.write.buffer = buffer;
 		slot.write.bytesTransferred = 0;
 		slot.write.mode = mode;
@@ -394,7 +402,11 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 		if (ret == SOCKET_ERROR) {
 			auto err = WSAGetLastError();
 			if (err == WSA_IO_PENDING) {
+
 				if (mode == IOMode.immediate) {
+					addRef(socket);
+					m_core.addWaiter();
+					() @trusted { CancelIoEx(cast(HANDLE)cast(SOCKET)socket, ovl); } ();
 					on_write_finish(socket, IOStatus.wouldBlock, 0);
 					return;
 				}
@@ -414,7 +426,11 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 	{
 		auto slot = () @trusted { return cast(SocketVector.FullField*)lpOverlapped.hEvent; } ();
 
-		if (!slot.streamSocket.write.callback) return;
+		if (!slot.streamSocket.write.callback) {
+			slot.common.core.removeWaiter();
+			slot.common.driver.releaseRef(cast(StreamSocketFD)slot.common.fd);
+			return;
+		}
 
 		void invokeCallback(IOStatus status, size_t nsent)
 		@safe nothrow {
@@ -503,7 +519,6 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 		if (!m_sockets[socket].streamSocket.read.callback) return;
 		CancelIoEx(cast(HANDLE)cast(SOCKET)socket, cast(LPOVERLAPPED)&m_sockets[socket].streamSocket.read.overlapped);
 		m_sockets[socket].streamSocket.read.callback = null;
-		m_core.removeWaiter();
 	}
 
 	override void cancelWrite(StreamSocketFD socket)
@@ -512,7 +527,6 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 		if (!m_sockets[socket].streamSocket.write.callback) return;
 		CancelIoEx(cast(HANDLE)cast(SOCKET)socket, cast(LPOVERLAPPED)&m_sockets[socket].streamSocket.write.overlapped);
 		m_sockets[socket].streamSocket.write.callback = null;
-		m_core.removeWaiter();
 	}
 
 	final override DatagramSocketFD createDatagramSocket(scope Address bind_address,
@@ -652,6 +666,9 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 			}
 		}
 
+		addRef(socket);
+		m_core.addWaiter();
+
 		if (mode == IOMode.immediate) {
 			() @trusted { CancelIoEx(cast(HANDLE)cast(SOCKET)socket, cast(LPOVERLAPPED)&slot.read.overlapped); } ();
 			on_read_finish(socket, IOStatus.wouldBlock, 0, null);
@@ -659,8 +676,6 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 		}
 
 		slot.read.callback = on_read_finish;
-		addRef(socket);
-		m_core.addWaiter();
 	}
 
 	override void cancelReceive(DatagramSocketFD socket)
@@ -668,7 +683,6 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 		if (!m_sockets[socket].datagramSocket.read.callback) return;
 		CancelIoEx(cast(HANDLE)cast(SOCKET)socket, cast(LPOVERLAPPED)&m_sockets[socket].datagramSocket.read.overlapped);
 		m_sockets[socket].datagramSocket.read.callback = null;
-		m_core.removeWaiter();
 	}
 
 	private static nothrow
@@ -676,7 +690,11 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 	{
 		auto slot = () @trusted { return cast(SocketVector.FullField*)lpOverlapped.hEvent; } ();
 
-		if (!slot.datagramSocket.read.callback) return;
+		if (!slot.datagramSocket.read.callback) {
+			slot.common.core.removeWaiter();
+			slot.common.driver.releaseRef(cast(DatagramSocketFD)slot.common.fd);
+			return;
+		}
 
 		void invokeCallback(IOStatus status, size_t nsent)
 		@safe nothrow {
@@ -755,6 +773,9 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 			}
 		}
 
+		addRef(socket);
+		m_core.addWaiter();
+
 		if (mode == IOMode.immediate) {
 			() @trusted { CancelIoEx(cast(HANDLE)cast(SOCKET)socket, cast(LPOVERLAPPED)&slot.write.overlapped); } ();
 			on_write_finish(socket, IOStatus.wouldBlock, 0, null);
@@ -762,8 +783,6 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 		}
 
 		slot.write.callback = on_write_finish;
-		addRef(socket);
-		m_core.addWaiter();
 	}
 
 	override void cancelSend(DatagramSocketFD socket)
@@ -771,7 +790,6 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 		if (!m_sockets[socket].datagramSocket.write.callback) return;
 		CancelIoEx(cast(HANDLE)cast(SOCKET)socket, cast(LPOVERLAPPED)&m_sockets[socket].datagramSocket.write.overlapped);
 		m_sockets[socket].datagramSocket.write.callback = null;
-		m_core.removeWaiter();
 	}
 
 	private static nothrow
@@ -779,7 +797,11 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 	{
 		auto slot = () @trusted { return cast(SocketVector.FullField*)lpOverlapped.hEvent; } ();
 
-		if (!slot.datagramSocket.write.callback) return;
+		if (!slot.datagramSocket.write.callback) {
+			slot.common.core.removeWaiter();
+			slot.common.driver.releaseRef(cast(DatagramSocketFD)slot.common.fd);
+			return;
+		}
 
 		void invokeCallback(IOStatus status, size_t nsent)
 		@safe nothrow {

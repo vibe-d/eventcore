@@ -1008,13 +1008,21 @@ final class RefAddress : Address {
 	}
 
 	this() @safe nothrow {}
-	this(sockaddr* addr, socklen_t addr_len) @safe nothrow { set(addr, addr_len); }
+	this(scope sockaddr* addr, socklen_t addr_len) @safe nothrow { set(addr, addr_len); }
 
 	override @property sockaddr* name() scope { return m_addr; }
 	override @property const(sockaddr)* name() const scope { return m_addr; }
 	override @property socklen_t nameLen() const scope { return m_addrLen; }
 
-	void set(sockaddr* addr, socklen_t addr_len) @safe nothrow { m_addr = addr; m_addrLen = addr_len; }
+	void set(scope sockaddr* addr, socklen_t addr_len)
+	@trusted nothrow scope {
+		// NOTE: the `scope` here really just applied to the scope of the
+		//       RefAddress instance. However, we move the `@trusted` annotation
+		//       here to avoid having to wrap every `addr` parameter passed
+		//       throughout this module.
+		m_addr = addr;
+		m_addrLen = addr_len;
+	}
 
 	void cap(socklen_t new_len)
 	scope @safe nothrow {
