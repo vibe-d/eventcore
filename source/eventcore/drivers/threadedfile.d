@@ -286,7 +286,7 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents) : EventDriverFil
 		try {
 			auto thiss = () @trusted { return cast(shared)this; } ();
 			auto fs = () @trusted { return cast(shared)f; } ();
-			m_fileThreadPool.put(task!(taskFun!("write", const(ubyte)))(thiss, fs, file, offset, buffer));
+			m_fileThreadPool.run!(taskFun!("write", const(ubyte)))(thiss, fs, file, offset, buffer);
 			startWaiting();
 		} catch (Exception e) {
 			m_activeWrites.remove(file.value);
@@ -327,7 +327,7 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents) : EventDriverFil
 		try {
 			auto thiss = () @trusted { return cast(shared)this; } ();
 			auto fs = () @trusted { return cast(shared)f; } ();
-			m_fileThreadPool.put(task!(taskFun!("read", ubyte))(thiss, fs, file, offset, buffer));
+			m_fileThreadPool.run!(taskFun!("read", ubyte))(thiss, fs, file, offset, buffer);
 			startWaiting();
 		} catch (Exception e) {
 			m_activeReads.remove(file.value);
