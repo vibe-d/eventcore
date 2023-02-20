@@ -386,5 +386,6 @@ package extern(System) @system nothrow
 void overlappedIOHandler(alias process, EXTRA...)(DWORD error, DWORD bytes_transferred, OVERLAPPED* _overlapped, EXTRA extra)
 {
 	auto overlapped = cast(OVERLAPPED_CORE*)_overlapped;
+	assert(overlapped.driver !is null, "Got overlapped callback after slot had already been cleared!");
 	overlapped.driver.m_ioEvents.put(IOEvent(&process, error, bytes_transferred, overlapped));
 }
