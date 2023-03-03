@@ -1007,8 +1007,8 @@ final class RefAddress : Address {
 		socklen_t m_addrLen;
 	}
 
-	this() @safe nothrow {}
-	this(scope sockaddr* addr, socklen_t addr_len) @safe nothrow { set(addr, addr_len); }
+	this() @safe nothrow scope {}
+	this(scope sockaddr* addr, socklen_t addr_len) @safe nothrow scope { set(addr, addr_len); }
 
 	override @property sockaddr* name() scope { return m_addr; }
 	override @property const(sockaddr)* name() const scope { return m_addr; }
