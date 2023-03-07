@@ -1,5 +1,7 @@
 module eventcore.drivers.posix.io_uring.files;
 
+version (linux):
+
 import eventcore.internal.utils;
 
 import eventcore.driver;
@@ -38,6 +40,7 @@ final class UringDriverFiles : EventDriverFiles
 		final switch (mode) {
 			case FileOpenMode.read: flags = O_RDONLY; break;
 			case FileOpenMode.readWrite: flags = O_RDWR; break;
+			case FileOpenMode.create: flags = O_RDWR|O_CREAT|O_EXCL; amode = octal!644; break;
 			case FileOpenMode.createTrunc: flags = O_RDWR|O_CREAT|O_TRUNC; amode = octal!644; break;
 			case FileOpenMode.append: flags = O_WRONLY|O_CREAT|O_APPEND; amode = octal!644; break;
 		}
@@ -57,13 +60,14 @@ final class UringDriverFiles : EventDriverFiles
 		final switch (mode) {
 			case FileOpenMode.read: flags = O_RDONLY; break;
 			case FileOpenMode.readWrite: flags = O_RDWR; break;
+			case FileOpenMode.create: flags = O_RDWR|O_CREAT|O_EXCL; amode = octal!644; break;
 			case FileOpenMode.createTrunc: flags = O_RDWR|O_CREAT|O_TRUNC; amode = octal!644; break;
 			case FileOpenMode.append: flags = O_WRONLY|O_CREAT|O_APPEND; amode = octal!644; break;
 		}
 
 		SubmissionEntry e;
 		prepOpenat(e, AT_FDCWD, path.toStringz, flags, amode);
-		m_loop.put(FD.init, EventType.status, e, &handleOpen, cast(UserCallback) userCb);
+		m_loop.put(FD.init, EventType.status, e, &handleOpen, () @trusted { return cast(UserCallback)userCb; } ());
 	}
 
 	private void handleOpen(FD fd, ref const(CompletionEntry) e, UserCallback userCb)
@@ -73,11 +77,11 @@ final class UringDriverFiles : EventDriverFiles
 		FileOpenCallback cb = cast(FileOpenCallback) userCb;
 		if (e.res == -1)
 		{
-			cb(FileFD.init, IOStatus.error);
+			cb(FileFD.init, OpenStatus.failed);
 			return;
 		}
 		FileFD fileFD = adopt(e.res);
-		cb(fileFD, IOStatus.ok);
+		cb(fileFD, OpenStatus.ok);
 	}
 
 	FileFD adopt(int system_file_handle)
