@@ -349,16 +349,14 @@ final class UringEventLoop
 
 void splitKey(ulong key, out OpIdx op, out EventType type) @nogc nothrow
 out { assert(op != OpIdx.init); }
-body
-{
+do {
 	op = cast(int) (key >> 32);
 	type = cast(EventType) ((key << 32) >>> 32);
 }
 
 ulong combineKey(OpIdx op, EventType type) @nogc nothrow
 in { assert(op != OpIdx.init); }
-body
-{
+do {
 	return cast(ulong)(op) << 32 | cast(uint) type;
 }
 
