@@ -69,8 +69,7 @@ final class UringDriverFiles : EventDriverFiles
 	private void handleOpen(FD fd, ref const(CompletionEntry) e, UserCallback userCb)
 		nothrow
 	in { assert (fd == FD.init); }
-	body
-	{
+	do {
 		FileOpenCallback cb = cast(FileOpenCallback) userCb;
 		if (e.res == -1)
 		{
