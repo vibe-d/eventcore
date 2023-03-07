@@ -41,15 +41,28 @@
 */
 module eventcore.drivers.posix.io_uring.io_uring;
 
-version (linux):
-
 import eventcore.driver;
 import eventcore.internal.utils;
 
 import core.time : Duration;
 
+
+/// substitue for UringCore that does nothing for
+/// non-uring posix event loops
+final class NoRing
+{
+	void registerEventID(EventID id) nothrow @trusted @nogc { }
+	void submit() nothrow @trusted @nogc { }
+	@property size_t waiterCount() const nothrow @safe { return 0; }
+	bool doProcessEvents(Duration timeout, bool dontWait = true) nothrow @trusted { return false; }
+}
+
+
+version (linux):
+
 import during;
 import std.stdio;
+static import std.typecons;
 
 /// eventcore allows exactly one simultaneous operation per kind per
 /// descriptor.
@@ -108,17 +121,6 @@ private struct UserData
 {
 	DataInitializer userDataDestructor;
 	ubyte[16*size_t.sizeof] userData;
-}
-
-
-/// substitue for UringCore that does nothing for
-/// non-uring posix event loops
-final class NoRing
-{
-	void registerEventID(EventID id) nothrow @trusted @nogc { }
-	void submit() nothrow @trusted @nogc { }
-	@property size_t waiterCount() const nothrow @safe { return 0; }
-	bool doProcessEvents(Duration timeout, bool dontWait = true) nothrow @trusted { return false; }
 }
 
 
@@ -262,7 +264,7 @@ final class UringEventLoop
 	}
 
 	package void put(in FD fd, in EventType type, SubmissionEntry e,
-		OpCallback cb, UserCallback userCb) nothrow
+		OpCallback cb, UserCallback userCb) @safe nothrow
 	{
 		import std.typecons : TypedefType;
 		m_runningOps += 1;
@@ -330,7 +332,7 @@ final class UringEventLoop
 		return null;
 	}
 
-	OpIdx allocOpData() nothrow @nogc
+	OpIdx allocOpData() @trusted nothrow @nogc
 	{
 		// TODO: use a free list or sth
 		for (int i = 0; ; ++i)
@@ -347,14 +349,14 @@ final class UringEventLoop
 	}
 }
 
-void splitKey(ulong key, out OpIdx op, out EventType type) @nogc nothrow
+void splitKey(ulong key, out OpIdx op, out EventType type) @safe @nogc nothrow
 out { assert(op != OpIdx.init); }
 do {
 	op = cast(int) (key >> 32);
 	type = cast(EventType) ((key << 32) >>> 32);
 }
 
-ulong combineKey(OpIdx op, EventType type) @nogc nothrow
+ulong combineKey(OpIdx op, EventType type) @safe @nogc nothrow
 in { assert(op != OpIdx.init); }
 do {
 	return cast(ulong)(op) << 32 | cast(uint) type;

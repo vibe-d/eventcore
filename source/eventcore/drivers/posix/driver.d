@@ -14,8 +14,8 @@ import eventcore.drivers.posix.sockets;
 import eventcore.drivers.posix.watchers;
 import eventcore.drivers.posix.processes;
 import eventcore.drivers.posix.pipes;
-import eventcore.drivers.posix.io_uring.io_uring : UringEventLoop, NoRing;
-import eventcore.drivers.posix.io_uring.files : UringDriverFiles;
+import eventcore.drivers.posix.io_uring.io_uring;
+import eventcore.drivers.posix.io_uring.files;
 import eventcore.drivers.timer;
 import eventcore.drivers.threadedfile;
 import eventcore.internal.consumablequeue : ConsumableQueue;
@@ -89,7 +89,7 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 	this()
 	@nogc @trusted {
 		m_loop = mallocT!Loop;
-		version (EventcoreEpollUsesUring) m_uring = mallocT!UringCore;
+		m_uring = mallocT!UringCore;
 		m_sockets = mallocT!SocketsDriver(m_loop);
 		m_events = mallocT!EventsDriver(m_loop, m_sockets);
 		m_signals = mallocT!SignalsDriver(m_loop);
