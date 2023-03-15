@@ -51,7 +51,7 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 		version (Windows) alias DNSDriver = EventDriverDNS_GHBN!(EventsDriver, SignalsDriver);
 		else version (EventcoreUseGAIA) alias DNSDriver = EventDriverDNS_GAIA!(EventsDriver, SignalsDriver);
 		else alias DNSDriver = EventDriverDNS_GAI!(EventsDriver, SignalsDriver);
-		alias FileDriver = ThreadedFileEventDriver!EventsDriver;
+		alias FileDriver = ThreadedFileEventDriver!(EventsDriver, CoreDriver);
 		version (Posix) alias PipeDriver = PosixEventDriverPipes!Loop;
 		else alias PipeDriver = DummyEventDriverPipes!Loop;
 		version (linux) alias WatcherDriver = InotifyEventDriverWatchers!EventsDriver;
@@ -84,7 +84,7 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 		m_processes = mallocT!ProcessDriver(m_loop, this);
 		m_core = mallocT!CoreDriver(m_loop, m_timers, m_events, m_processes);
 		m_dns = mallocT!DNSDriver(m_events, m_signals);
-		m_files = mallocT!FileDriver(m_events);
+		m_files = mallocT!FileDriver(m_events, m_core);
 		m_watchers = mallocT!WatcherDriver(m_events);
 	}
 
@@ -218,6 +218,8 @@ final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTime
 	}
 
 	@property size_t waiterCount() const { return m_loop.m_waiterCount + m_timers.pendingCount + m_processes.pendingCount; }
+
+	@property Loop loop() { return m_loop; }
 
 	final override ExitReason processEvents(Duration timeout)
 	{
@@ -377,6 +379,16 @@ package class PosixEventLoop {
 		foreach (i; 0 .. cast(int)m_fds.length)
 			if (m_fds[i].common.callback[evt])
 				del(FD(i, m_fds[i].common.validationCounter));
+	}
+
+	static if (__VERSION__ <= 2086) {
+		/// private
+		final void addWaiter() { m_waiterCount++; }
+		/// private
+		final void removeWaiter() { m_waiterCount--; }
+	} else {
+		package(eventcore.drivers) final void addWaiter() { m_waiterCount++; }
+		package(eventcore.drivers) final void removeWaiter() { m_waiterCount--; }
 	}
 
 	package void setNotifyCallback(EventType evt)(FD fd, FDSlotCallback callback)

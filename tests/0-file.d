@@ -7,13 +7,19 @@ module test;
 
 import eventcore.core;
 import eventcore.socket;
-import std.file : remove;
+import std.file : exists, remove;
 import std.socket : InternetAddress;
 import core.time : Duration, msecs;
 
 bool s_done = false;
 
 void main()
+{
+	testBasicIO();
+	testAsyncOpen();
+}
+
+void testBasicIO()
 {
 	auto f = eventDriver.files.open("test.txt", FileOpenMode.createTrunc);
 	assert(eventDriver.files.getSize(f) == 0);
@@ -76,4 +82,37 @@ void main()
 	assert(er == ExitReason.outOfWaiters);
 	assert(s_done);
 	s_done = false;
+}
+
+
+void testAsyncOpen()
+{
+	eventDriver.files.open("test.txt", FileOpenMode.createTrunc, (f, status) {
+		assert(f != FileFD.invalid);
+		assert(status == OpenStatus.ok);
+
+		eventDriver.files.open("test.txt", FileOpenMode.create, (f2, status2) {
+			assert(f2 == FileFD.invalid);
+			import std.conv : to;
+			try assert(status2 == OpenStatus.alreadyExists, status2.to!string);
+			catch (Exception e) assert(false, e.msg);
+
+			eventDriver.files.releaseRef(f);
+			try remove("test.txt");
+			catch (Exception e) {}
+			s_done = true;
+		});
+	});
+
+	ExitReason er;
+	do er = eventDriver.core.processEvents(Duration.max);
+	while (er == ExitReason.idle);
+	assert(er == ExitReason.outOfWaiters);
+	assert(s_done);
+	s_done = false;
+
+	if (exists("test.txt")) {
+		try remove("test.txt");
+		catch (Exception e) {}
+	}
 }
