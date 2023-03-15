@@ -23,6 +23,7 @@ final class WinAPIEventDriverFiles : EventDriverFiles {
 		m_core = core;
 	}
 
+	deprecated("Use the callback based overload")
 	override FileFD open(string path, FileOpenMode mode)
 	{
 		import std.utf : toUTF16z;

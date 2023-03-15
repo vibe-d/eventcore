@@ -152,6 +152,7 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents, Core : EventDriv
 		}
 	}
 
+	deprecated("Use the callback based overload")
 	final override FileFD open(string path, FileOpenMode mode)
 	{
 		OpenStatus st;
