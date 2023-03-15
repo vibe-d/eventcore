@@ -1125,6 +1125,8 @@ enum FileOpenMode {
 	read,
 	/// The file is opened for read-write random access.
 	readWrite,
+	/// Create the file and open read/write, fails if already existing
+	create,
 	/// The file is truncated if it exists or created otherwise and then opened for read-write access.
 	createTrunc,
 	/// The file is opened for appending data to it and created if it does not exist.

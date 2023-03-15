@@ -27,10 +27,32 @@ final class WinAPIEventDriverFiles : EventDriverFiles {
 	{
 		import std.utf : toUTF16z;
 
-		auto access = mode == FileOpenMode.readWrite || mode == FileOpenMode.createTrunc ? (GENERIC_WRITE | GENERIC_READ) :
-						mode == FileOpenMode.append ? FILE_APPEND_DATA : GENERIC_READ;
 		auto shareMode = FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE;
-		auto creation = mode == FileOpenMode.createTrunc ? CREATE_ALWAYS : mode == FileOpenMode.append? OPEN_ALWAYS : OPEN_EXISTING;
+
+		DWORD access, creation;
+
+		final switch (mode) {
+			case FileOpenMode.read:
+				access = GENERIC_READ;
+				creation = OPEN_EXISTING;
+				break;
+			case FileOpenMode.readWrite:
+				access = GENERIC_READ | GENERIC_WRITE;
+				creation = OPEN_EXISTING;
+				break;
+			case FileOpenMode.create:
+				access = GENERIC_READ | GENERIC_WRITE;
+				creation = CREATE_NEW;
+				break;
+			case FileOpenMode.createTrunc:
+				access = GENERIC_READ | GENERIC_WRITE;
+				creation = CREATE_ALWAYS;
+				break;
+			case FileOpenMode.append:
+				access = FILE_APPEND_DATA;
+				creation = OPEN_ALWAYS;
+				break;
+		}
 
 		auto handle = () @trusted {
 			scope (failure) assert(false);

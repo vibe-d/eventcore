@@ -160,6 +160,16 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents) : EventDriverFil
 		final switch (mode) {
 			case FileOpenMode.read: flags = O_RDONLY|O_BINARY; break;
 			case FileOpenMode.readWrite: flags = O_RDWR|O_BINARY; break;
+			case FileOpenMode.create:
+				static if (is(typeof(O_EXCL))) {
+					flags = O_RDWR|O_CREAT|O_EXCL|O_BINARY;
+				} else {
+					import std.file : exists;
+					flags = O_RDWR|O_CREAT|O_BINARY;
+					if (exists(path)) return FileFD.invalid;
+				}
+				amode = octal!644;
+				break;
 			case FileOpenMode.createTrunc: flags = O_RDWR|O_CREAT|O_TRUNC|O_BINARY; amode = octal!644; break;
 			case FileOpenMode.append: flags = O_WRONLY|O_CREAT|O_APPEND|O_BINARY; amode = octal!644; break;
 		}
