@@ -24,6 +24,11 @@ version (Posix) {
 	version (linux) enum SO_REUSEPORT = 15;
 	else enum SO_REUSEPORT = 0x200;
 
+	version (linux) {
+		static if (!is(typeof(IP_TRANSPARENT)))
+			enum IP_TRANSPARENT = 19;
+	}
+
 	static if (!is(typeof(O_CLOEXEC)))
 	{
 		version (linux) enum O_CLOEXEC = 0x80000;
@@ -248,6 +253,12 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 			version (Windows) {}
 			else {
 				if ((options & StreamListenOptions.reusePort) && setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, &tmp_reuse, tmp_reuse.sizeof) != 0)
+					return false;
+			}
+
+			version (linux)
+			{
+				if ((options & StreamListenOptions.ipTransparent) && setsockopt(sockfd, IPPROTO_IP, IP_TRANSPARENT, &tmp_reuse, tmp_reuse.sizeof) != 0)
 					return false;
 			}
 

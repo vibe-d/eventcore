@@ -1115,6 +1115,8 @@ enum StreamListenOptions {
 	reusePort = 1<<0,
 	/// Avoids applying the `SO_REUSEADDR` flag
 	reuseAddress = 1<<1,
+	/// Applies the `IP_TRANSPARENT` flag
+	ipTransparent = 1<<2,
 	///
 	defaults = reuseAddress,
 }
