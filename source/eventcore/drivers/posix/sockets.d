@@ -24,7 +24,10 @@ version (Posix) {
 	version (linux) enum SO_REUSEPORT = 15;
 	else enum SO_REUSEPORT = 0x200;
 
-	version (linux) enum IP_TRANSPARENT = 19;
+	version (linux) {
+		static if (!is(typeof(IP_TRANSPARENT)))
+			enum IP_TRANSPARENT = 19;
+	}
 
 	static if (!is(typeof(O_CLOEXEC)))
 	{
