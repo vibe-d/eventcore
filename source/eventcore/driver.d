@@ -471,7 +471,11 @@ interface EventDriverDNS {
 */
 interface EventDriverFiles {
 @safe: /*@nogc:*/ nothrow:
+	deprecated("Use the callback based overload")
 	FileFD open(string path, FileOpenMode mode);
+
+	void open(string path, FileOpenMode mode, FileOpenCallback on_opened);
+
 	FileFD adopt(int system_file_handle);
 
 	/** Disallows any reads/writes and removes any exclusive locks.
@@ -1039,6 +1043,7 @@ alias IOCallback = void delegate(StreamSocketFD, IOStatus, size_t);
 alias DatagramIOCallback = void delegate(DatagramSocketFD, IOStatus, size_t, scope RefAddress);
 alias DNSLookupCallback = void delegate(DNSLookupID, DNSStatus, scope RefAddress[]);
 alias FileIOCallback = void delegate(FileFD, IOStatus, size_t);
+alias FileOpenCallback = void delegate(FileFD, OpenStatus);
 alias FileCloseCallback = void delegate(FileFD, CloseStatus);
 alias PipeIOCallback = void delegate(PipeFD, IOStatus, size_t);
 alias PipeCloseCallback = void delegate(PipeFD, CloseStatus);
@@ -1063,6 +1068,21 @@ enum ExitReason {
 	idle,
 	outOfWaiters,
 	exited
+}
+
+enum OpenStatus {
+	/// The file was opened successfully
+	ok,
+	/// The file was not found
+	notFound,
+	/// The file was not accessible
+	notAccessible,
+	/// The file is already opened by another application
+	sharingViolation,
+	/// The file already exists and `FileOpenMode.create` was specified
+	alreadyExists,
+	/// Unknown error
+	failed
 }
 
 enum CloseStatus {
@@ -1125,6 +1145,8 @@ enum FileOpenMode {
 	read,
 	/// The file is opened for read-write random access.
 	readWrite,
+	/// Create the file and open read/write, fails if already existing
+	create,
 	/// The file is truncated if it exists or created otherwise and then opened for read-write access.
 	createTrunc,
 	/// The file is opened for appending data to it and created if it does not exist.

@@ -23,14 +23,13 @@ final class WinAPIEventDriverFiles : EventDriverFiles {
 		m_core = core;
 	}
 
+	deprecated("Use the callback based overload")
 	override FileFD open(string path, FileOpenMode mode)
 	{
 		import std.utf : toUTF16z;
 
-		auto access = mode == FileOpenMode.readWrite || mode == FileOpenMode.createTrunc ? (GENERIC_WRITE | GENERIC_READ) :
-						mode == FileOpenMode.append ? FILE_APPEND_DATA : GENERIC_READ;
-		auto shareMode = FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE;
-		auto creation = mode == FileOpenMode.createTrunc ? CREATE_ALWAYS : mode == FileOpenMode.append? OPEN_ALWAYS : OPEN_EXISTING;
+		DWORD access, creation, shareMode;
+		determineOpenMode(mode, access, creation, shareMode);
 
 		auto handle = () @trusted {
 			scope (failure) assert(false);
@@ -50,6 +49,88 @@ final class WinAPIEventDriverFiles : EventDriverFiles {
 		}
 
 		return adoptInternal(handle);
+	}
+
+	override void open(string path, FileOpenMode mode, FileOpenCallback on_opened)
+	{
+		import std.utf : toUTF16z;
+
+		DWORD access, creation, shareMode;
+		determineOpenMode(mode, access, creation, shareMode);
+
+		static void onThreadComplete(WinAPIEventDriverFiles driver,
+			HANDLE handle, DWORD error, FileOpenCallback callback)
+		@safe nothrow {
+			FileFD fd = handle != INVALID_HANDLE_VALUE ? driver.adoptInternal(handle) : FileFD.invalid;
+			OpenStatus st = OpenStatus.ok;
+			if (fd == FileFD.invalid) {
+				switch (error) {
+					default: st = OpenStatus.failed; break;
+					case ERROR_FILE_NOT_FOUND: st = OpenStatus.notFound; break;
+					case ERROR_ACCESS_DENIED: st = OpenStatus.notAccessible; break;
+					case ERROR_SHARING_VIOLATION: st = OpenStatus.sharingViolation; break;
+					case ERROR_FILE_EXISTS: st = OpenStatus.alreadyExists; break;
+				}
+			}
+			driver.m_core.removeWaiter();
+			callback(fd, st);
+		}
+
+		static void openInThread(WinAPIEventDriverFiles driver, string path,
+			DWORD access, DWORD creation, DWORD share_mode, FileOpenCallback on_opened)
+		@safe nothrow {
+			HANDLE handle = () @trusted {
+				scope (failure) assert(false);
+				return CreateFileW(path.toUTF16z, access, share_mode, null, creation,
+					FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, null);
+			} ();
+			DWORD errorcode = GetLastError();
+			if (handle != INVALID_HANDLE_VALUE) {
+				if (creation == CREATE_ALWAYS && errorcode == ERROR_ALREADY_EXISTS) {
+					if (!SetEndOfFile(handle)) {
+						CloseHandle(handle);
+						handle = INVALID_HANDLE_VALUE;
+					}
+				}
+			}
+
+			() @trusted {
+				auto core = cast(shared)driver.m_core;
+				core.runInOwnerThread(&onThreadComplete, driver, handle, errorcode, on_opened);
+			} ();
+		}
+
+		m_core.addWaiter();
+		workerPool.run!openInThread(this, path, access, creation, shareMode, on_opened);
+	}
+
+	private void determineOpenMode(FileOpenMode mode, out DWORD access,
+		out DWORD creation, out DWORD share_mode)
+	{
+		share_mode = FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE;
+
+		final switch (mode) {
+			case FileOpenMode.read:
+				access = GENERIC_READ;
+				creation = OPEN_EXISTING;
+				break;
+			case FileOpenMode.readWrite:
+				access = GENERIC_READ | GENERIC_WRITE;
+				creation = OPEN_EXISTING;
+				break;
+			case FileOpenMode.create:
+				access = GENERIC_READ | GENERIC_WRITE;
+				creation = CREATE_NEW;
+				break;
+			case FileOpenMode.createTrunc:
+				access = GENERIC_READ | GENERIC_WRITE;
+				creation = CREATE_ALWAYS;
+				break;
+			case FileOpenMode.append:
+				access = FILE_APPEND_DATA;
+				creation = OPEN_ALWAYS;
+				break;
+		}
 	}
 
 	override FileFD adopt(int system_handle)

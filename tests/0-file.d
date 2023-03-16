@@ -7,17 +7,28 @@ module test;
 
 import eventcore.core;
 import eventcore.socket;
-import std.file : remove;
+import std.file : exists, remove;
 import std.socket : InternetAddress;
 import core.time : Duration, msecs;
 
-bool s_done;
+bool s_done = false;
 
 void main()
+{
+	testBasicIO();
+	testAsyncOpen();
+}
+
+void testBasicIO()
 {
 	auto f = eventDriver.files.open("test.txt", FileOpenMode.createTrunc);
 	assert(eventDriver.files.getSize(f) == 0);
 	auto data = cast(const(ubyte)[])"Hello, World!";
+
+	scope (failure) {
+		try remove("test.txt");
+		catch (Exception e) {}
+	}
 
 	eventDriver.files.write(f, 0, data[0 .. 7], IOMode.all, (f, status, nbytes) {
 		assert(status == IOStatus.ok);
@@ -38,11 +49,26 @@ void main()
 					assert(dst == data);
 					eventDriver.files.close(f, (f, s) {
 						assert(s == CloseStatus.ok);
+
+						// attempt to re-create the existing file, should fail
+						assert(eventDriver.files.open("test.txt", FileOpenMode.create) == FileFD.invalid);
+
 						() @trusted {
 							scope (failure) assert(false);
 							remove("test.txt");
 						} ();
 						eventDriver.files.releaseRef(f);
+
+						// attempt to create the file after it has been deleted, should succeed
+						auto f2 = eventDriver.files.open("test.txt", FileOpenMode.create);
+						assert(f2 != FileFD.invalid);
+						assert(eventDriver.files.getSize(f2) == 0);
+						eventDriver.files.releaseRef(f2);
+						() @trusted {
+							scope (failure) assert(false);
+							remove("test.txt");
+						} ();
+
 						s_done = true;
 					});
 				});
@@ -56,4 +82,37 @@ void main()
 	assert(er == ExitReason.outOfWaiters);
 	assert(s_done);
 	s_done = false;
+}
+
+
+void testAsyncOpen()
+{
+	eventDriver.files.open("test.txt", FileOpenMode.createTrunc, (f, status) {
+		assert(f != FileFD.invalid);
+		assert(status == OpenStatus.ok);
+
+		eventDriver.files.open("test.txt", FileOpenMode.create, (f2, status2) {
+			assert(f2 == FileFD.invalid);
+			import std.conv : to;
+			try assert(status2 == OpenStatus.alreadyExists, status2.to!string);
+			catch (Exception e) assert(false, e.msg);
+
+			eventDriver.files.releaseRef(f);
+			try remove("test.txt");
+			catch (Exception e) {}
+			s_done = true;
+		});
+	});
+
+	ExitReason er;
+	do er = eventDriver.core.processEvents(Duration.max);
+	while (er == ExitReason.idle);
+	assert(er == ExitReason.outOfWaiters);
+	assert(s_done);
+	s_done = false;
+
+	if (exists("test.txt")) {
+		try remove("test.txt");
+		catch (Exception e) {}
+	}
 }

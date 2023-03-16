@@ -65,7 +65,7 @@ private {
 }
 
 
-final class ThreadedFileEventDriver(Events : EventDriverEvents) : EventDriverFiles
+final class ThreadedFileEventDriver(Events : EventDriverEvents, Core : EventDriverCore) : EventDriverFiles
 {
 	import std.parallelism;
 
@@ -126,13 +126,15 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents) : EventDriverFil
 		EventID m_readyEvent = EventID.invalid;
 		bool m_waiting;
 		Events m_events;
+		Core m_core;
 	}
 
 	@safe: nothrow:
 
-	this(Events events)
+	this(Events events, Core core)
 	{
 		m_events = events;
+		m_core = core;
 	}
 
 	void dispose()
@@ -150,7 +152,39 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents) : EventDriverFil
 		}
 	}
 
+	deprecated("Use the callback based overload")
 	final override FileFD open(string path, FileOpenMode mode)
+	{
+		OpenStatus st;
+		auto fd = doOpen(path, mode, st);
+		if (fd < 0) return FileFD.init;
+		return adopt(fd);
+	}
+
+	final override void open(string path, FileOpenMode mode, FileOpenCallback on_opened)
+	{
+		static void openFinished(ThreadedFileEventDriver driver, int fd,
+			OpenStatus status, FileOpenCallback callback)
+		@safe nothrow {
+			auto res = fd < 0 ? FileFD.invalid : driver.adopt(fd);
+			driver.m_core.loop.removeWaiter();
+			callback(res, status);
+		}
+
+		static void openInThread(ThreadedFileEventDriver driver, string path, FileOpenMode mode, FileOpenCallback on_opened)
+		@safe nothrow {
+			OpenStatus st;
+			auto fd = doOpen(path, mode, st);
+			() @trusted {
+				(cast(shared)driver.m_core).runInOwnerThread(&openFinished, driver, fd, st, on_opened);
+			} ();
+		}
+
+		m_core.loop.addWaiter();
+		m_fileThreadPool.run!openInThread(this, path, mode, on_opened);
+	}
+
+	private static int doOpen(string path, FileOpenMode mode, out OpenStatus status)
 	{
 		import std.string : toStringz;
 
@@ -160,12 +194,39 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents) : EventDriverFil
 		final switch (mode) {
 			case FileOpenMode.read: flags = O_RDONLY|O_BINARY; break;
 			case FileOpenMode.readWrite: flags = O_RDWR|O_BINARY; break;
+			case FileOpenMode.create:
+				static if (is(typeof(O_EXCL))) {
+					flags = O_RDWR|O_CREAT|O_EXCL|O_BINARY;
+				} else {
+					import std.file : exists;
+					flags = O_RDWR|O_CREAT|O_BINARY;
+					if (exists(path)) {
+						status = OpenStatus.alreadyExists;
+						return -1;
+					}
+				}
+				amode = octal!644;
+				break;
 			case FileOpenMode.createTrunc: flags = O_RDWR|O_CREAT|O_TRUNC|O_BINARY; amode = octal!644; break;
 			case FileOpenMode.append: flags = O_WRONLY|O_CREAT|O_APPEND|O_BINARY; amode = octal!644; break;
 		}
 		auto fd = () @trusted { return .open(path.toStringz(), flags, amode); } ();
-		if (fd < 0) return FileFD.init;
-		return adopt(fd);
+		if (fd < 0) {
+			switch (errno) {
+				default: status = OpenStatus.failed; break;
+				case ENOENT: status = OpenStatus.notFound; break;
+				case EACCES: status = OpenStatus.notAccessible; break;
+				case EBUSY: status = OpenStatus.sharingViolation; break;
+				static if (is(typeof(ETXTBSY))) {
+					case ETXTBSY: status = OpenStatus.sharingViolation; break;
+				}
+				case EEXIST: status = OpenStatus.alreadyExists; break;
+			}
+			return -1;
+		}
+
+		status = OpenStatus.ok;
+		return fd;
 	}
 
 	final override FileFD adopt(int system_file_handle)
