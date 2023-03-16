@@ -6,6 +6,7 @@ import eventcore.internal.utils;
 
 import eventcore.driver;
 import eventcore.drivers.posix.io_uring.io_uring;
+import core.stdc.errno;
 import core.sys.posix.sys.types;
 import core.sys.posix.sys.stat;
 import core.sys.linux.fcntl;
@@ -77,7 +78,18 @@ final class UringDriverFiles : EventDriverFiles
 		FileOpenCallback cb = cast(FileOpenCallback) userCb;
 		if (e.res == -1)
 		{
-			cb(FileFD.init, OpenStatus.failed);
+			OpenStatus status;
+			switch (errno) {
+				default: status = OpenStatus.failed; break;
+				case ENOENT: status = OpenStatus.notFound; break;
+				case EACCES: status = OpenStatus.notAccessible; break;
+				case EBUSY: status = OpenStatus.sharingViolation; break;
+				static if (is(typeof(ETXTBSY))) {
+					case ETXTBSY: status = OpenStatus.sharingViolation; break;
+				}
+				case EEXIST: status = OpenStatus.alreadyExists; break;
+			}
+			cb(FileFD.init, status);
 			return;
 		}
 		FileFD fileFD = adopt(e.res);
