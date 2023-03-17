@@ -181,6 +181,7 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents, Core : EventDriv
 		}
 
 		m_core.loop.addWaiter();
+		threadSetup();
 		m_fileThreadPool.run!openInThread(this, path, mode, on_opened);
 	}
 
