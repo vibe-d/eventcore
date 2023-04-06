@@ -2,7 +2,7 @@ module eventcore.internal.coreservices;
 
 import eventcore.internal.corefoundation;
 
-version (darwin):
+static if (isAppleOS):
 
 nothrow extern(C):
 

@@ -23,7 +23,7 @@ configuration "epoll-gaia" {
 }
 
 configuration "cfrunloop" {
-	platforms "osx"
+	platforms "osx" "ios" "tvos" "watchos"
 	versions "EventcoreCFRunLoopDriver"
 	lflags "-framework" "CoreFoundation"
 	lflags "-framework" "CoreServices"

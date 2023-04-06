@@ -16,10 +16,11 @@ Supported drivers and operating systems
 
 Driver               | Linux   | Windows | macOS   | FreeBSD | Android | iOS
 ---------------------|---------|---------|---------|---------|---------|---------
-SelectEventDriver    | yes     | yes     | yes     | yes¹    | yes     | &mdash;
+SelectEventDriver    | yes     | yes     | yes     | yes¹    | yes     | yes
 EpollEventDriver     | yes     | &mdash; | &mdash; | &mdash; | yes     | &mdash;
 WinAPIEventDriver    | &mdash; | yes     | &mdash; | &mdash; | &mdash; | &mdash;
-KqueueEventDriver    | &mdash; | &mdash; | yes     | yes¹    | &mdash; | &mdash;
+KqueueEventDriver    | &mdash; | &mdash; | yes     | yes¹    | &mdash; | yes
+CFRunloopEventDriver | &mdash; | &mdash; | yes     | &mdash; | &mdash; | yes
 LibasyncEventDriver  | &mdash;¹| &mdash;¹| &mdash;¹| &mdash;¹| &mdash; | &mdash;
 
 ¹ planned, but not currenly implemented
@@ -30,36 +31,29 @@ Supported compilers
 
 The following compilers are tested and supported:
 
-- DMD 2.087.1
+- DMD 2.103.0
 - DMD 2.086.1
-- DMD 2.085.1
-- DMD 2.084.1
-- DMD 2.079.0
-- LDC 1.17.0
+- LDC 1.32.0
 - LDC 1.16.0
-- LDC 1.15.0
-- LDC 1.14.0
-- LDC 1.13.0
-- LDC 1.9.0
 
 
 Driver development status
 -------------------------
 
-Feature \ EventDriver | Select | Epoll | WinAPI  | Kqueue  | Libasync
-----------------------|--------|-------|---------|---------|----------
-TCP Sockets           | yes    | yes   | yes     | yes     | &mdash;
-UDP Sockets           | yes    | yes   | yes     | yes     | &mdash;
-USDS                  | yes    | yes   | &mdash; | yes     | &mdash;
-DNS                   | yes    | yes   | yes     | yes     | &mdash;
-Timers                | yes    | yes   | yes     | yes     | &mdash;
-Events                | yes    | yes   | yes     | yes     | &mdash;
-Unix Signals          | yes²   | yes   | &mdash; | &mdash; | &mdash;
-Files                 | yes    | yes   | yes     | yes     | &mdash;
-UI Integration        | yes¹   | yes¹  | yes     | yes¹    | &mdash;
-File watcher          | yes²   | yes   | yes     | yes²    | &mdash;
-Pipes                 | yes    | yes   | &mdash; | yes     | &mdash;
-Processes             | yes    | yes   | &mdash; | yes     | &mdash;
+Feature \ EventDriver | Select | Epoll | WinAPI  | Kqueue  | CFRunloop | Libasync
+----------------------|--------|-------|---------|---------|-----------|----------
+TCP Sockets           | yes    | yes   | yes     | yes     | yes       | &mdash;
+UDP Sockets           | yes    | yes   | yes     | yes     | yes       | &mdash;
+USDS                  | yes    | yes   | &mdash; | yes     | yes       | &mdash;
+DNS                   | yes    | yes   | yes     | yes     | yes       | &mdash;
+Timers                | yes    | yes   | yes     | yes     | yes       | &mdash;
+Events                | yes    | yes   | yes     | yes     | yes       | &mdash;
+Unix Signals          | yes²   | yes   | &mdash; | &mdash; | &mdash;   | &mdash;
+Files                 | yes    | yes   | yes     | yes     | yes       | &mdash;
+UI Integration        | yes¹   | yes¹  | yes     | yes¹    | yes¹      | &mdash;
+File watcher          | yes²   | yes   | yes     | yes²    | yes²      | &mdash;
+Pipes                 | yes    | yes   | &mdash; | yes     | yes       | &mdash;
+Processes             | yes    | yes   | &mdash; | yes     | yes       | &mdash;
 
 ¹ Manually, by adopting the X11 display connection socket
 

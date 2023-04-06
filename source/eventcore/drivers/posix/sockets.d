@@ -3,6 +3,7 @@ module eventcore.drivers.posix.sockets;
 
 import eventcore.driver;
 import eventcore.drivers.posix.driver;
+import eventcore.internal.corefoundation : isAppleOS;
 import eventcore.internal.utils;
 
 import std.algorithm.comparison : among, min, max;
@@ -37,8 +38,7 @@ version (Posix) {
 		else version (DragonFlyBSD) enum O_CLOEXEC = 0x0020000;
 		else version (NetBSD) enum O_CLOEXEC = 0x400000;
 		else version (OpenBSD) enum O_CLOEXEC = 0x10000;
-		else version (OSX) enum O_CLOEXEC = 0x1000000;
-		else version (iOS) enum O_CLOEXEC = 0x1000000;
+		else static if (isAppleOS) enum O_CLOEXEC = 0x1000000;
 	}
 }
 version (linux) {
@@ -64,11 +64,7 @@ version (linux) {
 	static if (!is(typeof(TCP_USER_TIMEOUT)))
 		enum TCP_USER_TIMEOUT = 18;
 }
-version (OSX) {
-    import core.sys.darwin.netinet.in_ : IP_ADD_MEMBERSHIP, IP_MULTICAST_LOOP;
-	static if (!is(typeof(ESHUTDOWN))) enum ESHUTDOWN = 58;
-}
-version (iOS) {
+static if (isAppleOS) {
     import core.sys.darwin.netinet.in_ : IP_ADD_MEMBERSHIP, IP_MULTICAST_LOOP;
 	static if (!is(typeof(ESHUTDOWN))) enum ESHUTDOWN = 58;
 }
@@ -111,9 +107,7 @@ version (Android) {
 }
 
 version (Posix) {
-	version (OSX) {
-		enum SEND_FLAGS = 0;
-	} else version (iOS) {
+	static if (isAppleOS) {
 		enum SEND_FLAGS = 0;
 	} else {
 		enum SEND_FLAGS = MSG_NOSIGNAL;
@@ -1143,7 +1137,7 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 			setSocketNonBlocking(sock, true);
 
 			// Prevent SIGPIPE on failed send
-			version (OSX) {
+			static if (isAppleOS) {
 				int val = 1;
 				() @trusted { setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, &val, val.sizeof); } ();
 			}
