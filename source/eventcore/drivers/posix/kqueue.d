@@ -7,9 +7,11 @@
 module eventcore.drivers.posix.kqueue;
 @safe: /*@nogc:*/ nothrow:
 
+import eventcore.internal.corefoundation : isAppleOS;
+
 version (FreeBSD) enum have_kqueue = true;
 else version (DragonFlyBSD) enum have_kqueue = true;
-else version (OSX) enum have_kqueue = true;
+else static if (isAppleOS) enum have_kqueue = true;
 else enum have_kqueue = false;
 
 static if (have_kqueue):
@@ -20,13 +22,10 @@ import eventcore.internal.utils;
 import core.time : Duration;
 import core.sys.posix.sys.time : timespec, time_t;
 
-version (OSX) import core.sys.darwin.sys.event;
+static if (isAppleOS) import core.sys.darwin.sys.event;
 else version (FreeBSD) import core.sys.freebsd.sys.event;
 else version (DragonFlyBSD) import core.sys.dragonflybsd.sys.event;
 else static assert(false, "Kqueue not supported on this OS.");
-
-
-import core.sys.linux.epoll;
 
 
 alias KqueueEventDriver = PosixEventDriver!KqueueEventLoop;

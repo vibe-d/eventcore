@@ -1,6 +1,12 @@
 module eventcore.internal.corefoundation;
 
-version (darwin):
+version (OSX) enum isAppleOS = true;
+else version (iOS) enum isAppleOS = true;
+else version (TVOS) enum isAppleOS = true;
+else version (WatchOS) enum isAppleOS = true;
+else enum isAppleOS = false;
+
+static if (isAppleOS):
 
 nothrow extern(C):
 
