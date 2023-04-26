@@ -84,7 +84,6 @@ test_exe = executable(
 	eventcore_src,
 	include_directories: include_directories('../'),
 	d_unittest: true,
-	d_args: meson.get_compiler('d').unittest_args(),
 	link_args: '-main',
 	dependencies: taggedalgebraic_dep,
 )

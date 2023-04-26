@@ -115,5 +115,6 @@ subdir('source/eventcore')
 
 eventcore_dep = declare_dependency(
 	include_directories: include_directories('source'),
+	dependencies: taggedalgebraic_dep,
 	link_with: eventcore_lib
 )
