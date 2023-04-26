@@ -118,3 +118,5 @@ eventcore_dep = declare_dependency(
 	dependencies: taggedalgebraic_dep,
 	link_with: eventcore_lib
 )
+
+meson.override_dependency('eventcore', eventcore_dep)
