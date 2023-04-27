@@ -1,5 +1,4 @@
 project('eventcore', 'd',
-	meson_version: '>=0.53',
 	version: '0.9.13',
 )
 
