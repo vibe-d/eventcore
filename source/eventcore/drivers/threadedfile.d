@@ -20,11 +20,11 @@ version (Windows) {
 
 		extern(C) nothrow {
 			alias off_t = sizediff_t;
-			int open(in char* name, int mode, ...);
-			int chmod(in char* name, int mode);
+			int open(const(char)* name, int mode, ...);
+			int chmod(const(char)* name, int mode);
 			int close(int fd) @safe;
 			int read(int fd, void *buffer, uint count);
-			int write(int fd, in void *buffer, uint count);
+			int write(int fd, const(void) *buffer, uint count);
 			long _lseeki64(int fd, long offset, int origin) @safe;
 		}
 
