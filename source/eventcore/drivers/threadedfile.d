@@ -247,7 +247,7 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents, Core : EventDriv
 		return FileFD(system_file_handle, vc + 1);
 	}
 
-	void close(FileFD file, FileCloseCallback on_closed)
+	void close(FileFD file, FileCloseCallback on_closed) scope
 	{
 		if (!isValid(file)) {
 			on_closed(file, CloseStatus.invalidHandle);
@@ -328,7 +328,7 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents, Core : EventDriv
 	}
 
 
-	final override void write(FileFD file, ulong offset, const(ubyte)[] buffer, IOMode, FileIOCallback on_write_finish)
+	final override void write(FileFD file, ulong offset, return const(ubyte)[] buffer, IOMode mode, return FileIOCallback on_write_finish)
 	{
 		if (!isValid(file)) {
 			on_write_finish(file, IOStatus.invalidHandle, 0);
@@ -336,12 +336,13 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents, Core : EventDriv
 		}
 
 		//assert(this.writable);
-		auto f = () @trusted { return &m_files[file]; } ();
+		scope f = () @trusted { return &m_files[file]; } ();
 
 		if (!safeCAS(f.write.status, ThreadedFileStatus.idle, ThreadedFileStatus.initiated))
 			assert(false, "Concurrent file writes are not allowed.");
 		assert(f.write.callback is null, "Concurrent file writes are not allowed.");
-		f.write.callback = on_write_finish;
+		// cast away return/scope
+		f.write.callback = (() @trusted => *cast(FileIOCallback*) &on_write_finish)();
 		m_activeWrites.insert(file.value);
 		threadSetup();
 		log("start write task");
@@ -370,7 +371,7 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents, Core : EventDriv
 		safeCAS(f.status, ThreadedFileStatus.processing, ThreadedFileStatus.cancelling);
 	}
 
-	final override void read(FileFD file, ulong offset, ubyte[] buffer, IOMode, FileIOCallback on_read_finish)
+	final override void read(FileFD file, ulong offset, return ubyte[] buffer, IOMode mode, return FileIOCallback on_read_finish)
 	{
 		if (!isValid(file)) {
 			on_read_finish(file, IOStatus.invalidHandle, 0);
@@ -382,7 +383,7 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents, Core : EventDriv
 		if (!safeCAS(f.read.status, ThreadedFileStatus.idle, ThreadedFileStatus.initiated))
 			assert(false, "Concurrent file reads are not allowed.");
 		assert(f.read.callback is null, "Concurrent file reads are not allowed.");
-		f.read.callback = on_read_finish;
+		f.read.callback = (() @trusted => *cast(FileIOCallback*) &on_read_finish)();
 		m_activeReads.insert(file.value);
 		threadSetup();
 		log("start read task");
@@ -411,20 +412,20 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents, Core : EventDriv
 		safeCAS(f.status, ThreadedFileStatus.processing, ThreadedFileStatus.cancelling);
 	}
 
-	final override bool isValid(FileFD handle)
+	final override bool isValid(FileFD handle) scope
 	const {
 		if (handle.value >= m_files.length) return false;
 		return m_files[handle.value].validationCounter == handle.validationCounter;
 	}
 
-	final override void addRef(FileFD descriptor)
+	final override void addRef(FileFD descriptor) scope
 	{
 		if (!isValid(descriptor)) return;
 
 		m_files[descriptor].refCount++;
 	}
 
-	final override bool releaseRef(FileFD descriptor)
+	final override bool releaseRef(FileFD descriptor) scope
 	{
 		if (!isValid(descriptor)) return true;
 
@@ -455,7 +456,7 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents, Core : EventDriv
 	}
 
 	/// private
-	static void taskFun(string op, UB)(shared(ThreadedFileEventDriver) files, shared(FileInfo)* fi, FileFD file, ulong offset, UB[] buffer)
+	static void taskFun(string op, UB)(shared(ThreadedFileEventDriver) files, shared(FileInfo)* fi, FileFD file, ulong offset, scope UB[] buffer)
 	{
 log("task fun");
 		shared(IOInfo)* f = mixin("&fi."~op);
