@@ -17,6 +17,7 @@ void main()
 {
 	testBasicIO();
 	testAsyncOpen();
+	testReadOnce();
 }
 
 void testBasicIO()
@@ -115,4 +116,91 @@ void testAsyncOpen()
 		try remove("test.txt");
 		catch (Exception e) {}
 	}
+}
+
+ulong totalSystemMemory()
+{
+	version (Posix)
+	{
+		import core.sys.posix.unistd;
+
+		long pages = sysconf(_SC_PHYS_PAGES);
+		long page_size = sysconf(_SC_PAGE_SIZE);
+		return pages * page_size;
+	}
+	else version (Windows)
+	{
+		import core.sys.windows.windows;
+
+		MEMORYSTATUSEX status;
+		status.dwLength = sizeof(status);
+		GlobalMemoryStatusEx(&status);
+		return status.ullTotalPhys;
+	}
+	else
+	{
+		// 4 GB as fallback
+
+		return 1024 * 1024 * 1024 * 4;
+	}
+}
+
+void testReadOnce()
+{
+	// 3x this amount will be allocated in memory
+	// by default 3/16 of system memory will be attempted to be allocated for large buffer tests
+	auto MBs = totalSystemMemory / 16 / 1024 / 1024;
+	if (MBs < 1024)
+		log("warning: may not have enough system memory for this test, if the following assert fails, the buffer was too small");
+
+	auto f = eventDriver.files.open("test.txt", FileOpenMode.createTrunc);
+	assert(eventDriver.files.getSize(f) == 0);
+	auto data = new ubyte[1024 * 1024 * MBs];
+	ubyte[] buffer = new ubyte[2 * 1024 * 1024 * MBs];
+	(cast(int[]) data)[] = int('A' | 'a' << 8 | 'a' << 16 | 'a' << 24);
+
+	scope (failure) {
+		try remove("test.txt");
+		catch (Exception e) {}
+	}
+
+	eventDriver.files.write(f, 0, data, IOMode.all, (f, status, nbytes) {
+		assert(status == IOStatus.ok);
+		assert(nbytes == data.length);
+		assert(eventDriver.files.getSize(f) == data.length);
+
+		eventDriver.files.write(f, data.length, data, IOMode.all, (f, status, nbytes) {
+			assert(status == IOStatus.ok);
+			assert(nbytes == data.length);
+			assert(eventDriver.files.getSize(f) == data.length * 2);
+
+			eventDriver.files.read(f, 0, buffer, IOMode.once, (f, status, nbytes) {
+				assert(status == IOStatus.ok);
+				assert(nbytes < buffer.length, "did not expect to be able to read this much data at once in an immediate step!");
+				if (nbytes > data.length)
+					nbytes = data.length;
+				assert(buffer[0 .. nbytes] == data[0 .. nbytes]);
+
+				() @trusted {
+					scope (failure) assert(false);
+					remove("test.txt");
+				} ();
+				s_done = true;
+			});
+		});
+	});
+
+	ExitReason er;
+	do er = eventDriver.core.processEvents(Duration.max);
+	while (er == ExitReason.idle);
+	assert(er == ExitReason.outOfWaiters);
+	assert(s_done);
+	s_done = false;
+}
+
+void log(string s)
+@safe nothrow {
+	import std.stdio : writeln;
+	scope (failure) assert(false);
+	writeln(s);
 }

@@ -348,7 +348,7 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents, Core : EventDriv
 		try {
 			auto thiss = () @trusted { return cast(shared)this; } ();
 			auto fs = () @trusted { return cast(shared)f; } ();
-			m_fileThreadPool.run!(taskFun!("write", const(ubyte)))(thiss, fs, file, offset, buffer);
+			m_fileThreadPool.run!(taskFun!("write", const(ubyte)))(thiss, fs, file, offset, mode, buffer);
 			startWaiting();
 		} catch (Exception e) {
 			m_activeWrites.remove(file.value);
@@ -389,7 +389,7 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents, Core : EventDriv
 		try {
 			auto thiss = () @trusted { return cast(shared)this; } ();
 			auto fs = () @trusted { return cast(shared)f; } ();
-			m_fileThreadPool.run!(taskFun!("read", ubyte))(thiss, fs, file, offset, buffer);
+			m_fileThreadPool.run!(taskFun!("read", ubyte))(thiss, fs, file, offset, mode, buffer);
 			startWaiting();
 		} catch (Exception e) {
 			m_activeReads.remove(file.value);
@@ -455,7 +455,7 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents, Core : EventDriv
 	}
 
 	/// private
-	static void taskFun(string op, UB)(shared(ThreadedFileEventDriver) files, shared(FileInfo)* fi, FileFD file, ulong offset, UB[] buffer)
+	static void taskFun(string op, UB)(shared(ThreadedFileEventDriver) files, shared(FileInfo)* fi, FileFD file, ulong offset, IOMode mode, scope UB[] buffer)
 	{
 log("task fun");
 		shared(IOInfo)* f = mixin("&fi."~op);
@@ -485,14 +485,18 @@ log("trigger event");
 		while (bytes.length > 0) {
 			auto sz = min(bytes.length, 512*1024);
 			auto ret = () @trusted { return mixin("."~op)(cast(int)file, bytes.ptr, cast(uint)sz); } ();
-			if (ret != sz) {
+			if (ret == -1) {
 				safeAtomicStore(f.ioStatus, IOStatus.error);
 log("error");
 				break;
+			} else if (ret == 0) {
+				break;
 			}
-			bytes = bytes[sz .. $];
+			bytes = bytes[ret .. $];
 log("check for cancel");
 			if (safeCAS(f.status, ThreadedFileStatus.cancelling, ThreadedFileStatus.cancelled)) return;
+			if (mode != IOMode.all)
+				break;
 		}
 
 		safeAtomicStore(f.bytesWritten, buffer.length - bytes.length);
