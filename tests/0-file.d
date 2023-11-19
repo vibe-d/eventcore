@@ -133,7 +133,7 @@ ulong totalSystemMemory()
 		import core.sys.windows.windows;
 
 		MEMORYSTATUSEX status;
-		status.dwLength = sizeof(status);
+		status.dwLength = status.sizeof;
 		GlobalMemoryStatusEx(&status);
 		return status.ullTotalPhys;
 	}

@@ -328,7 +328,7 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents, Core : EventDriv
 	}
 
 
-	final override void write(FileFD file, ulong offset, const(ubyte)[] buffer, IOMode, FileIOCallback on_write_finish)
+	final override void write(FileFD file, ulong offset, const(ubyte)[] buffer, IOMode mode, FileIOCallback on_write_finish)
 	{
 		if (!isValid(file)) {
 			on_write_finish(file, IOStatus.invalidHandle, 0);
@@ -370,7 +370,7 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents, Core : EventDriv
 		safeCAS(f.status, ThreadedFileStatus.processing, ThreadedFileStatus.cancelling);
 	}
 
-	final override void read(FileFD file, ulong offset, ubyte[] buffer, IOMode, FileIOCallback on_read_finish)
+	final override void read(FileFD file, ulong offset, ubyte[] buffer, IOMode mode, FileIOCallback on_read_finish)
 	{
 		if (!isValid(file)) {
 			on_read_finish(file, IOStatus.invalidHandle, 0);
