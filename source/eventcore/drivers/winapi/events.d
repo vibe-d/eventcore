@@ -42,7 +42,9 @@ final class WinAPIEventDriverEvents : EventDriverEvents {
 	void dispose()
 	@trusted {
 		scope (failure) assert(false);
+		DeleteCriticalSection(&m_mutex);
 		freeT(m_pending);
+		CloseHandle(m_event);
 	}
 
 	package bool checkForLeakedHandles()
@@ -141,7 +143,6 @@ final class WinAPIEventDriverEvents : EventDriverEvents {
 			() @trusted nothrow {
 				scope (failure) assert(false);
 				destroy(pe.waiters);
-				CloseHandle(idToHandle(descriptor));
 			} ();
 			m_events.remove(descriptor);
 			return false;
