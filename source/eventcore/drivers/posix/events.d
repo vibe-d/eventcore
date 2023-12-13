@@ -72,8 +72,13 @@ final class PosixEventDriverEvents(Loop : PosixEventLoop, Sockets : EventDriverS
 				() @trusted { fcntl(fd[1], F_SETFL, O_CLOEXEC); } ();
 			} else {
 				// fake missing socketpair support on Windows
-				import std.socket : InternetAddress;
-				scope addr = new InternetAddress(0x7F000001, 0);
+				import core.sys.windows.winsock2 : AF_INET, htonl, sockaddr, sockaddr_in, socklen_t;
+				import std.conv : emplace;
+				scope sockaddr_in sa;
+				sa.sin_family = AF_INET;
+				sa.sin_addr.s_addr = htonl(0x7F000001);
+				ubyte[__traits(classInstanceSize, RefAddress)] addrbuf = void;
+				scope addr = () @trusted { return emplace!RefAddress(addrbuf, cast(sockaddr*)&sa, cast(socklen_t)sa.sizeof); } ();
 				auto s = m_sockets.createDatagramSocketInternal(addr, null, DatagramCreateOptions.none, true);
 				if (s == DatagramSocketFD.invalid) return EventID.invalid;
 				fd[0] = cast(sock_t)s;

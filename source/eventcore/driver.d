@@ -1011,15 +1011,17 @@ final class RefAddress : Address {
 		socklen_t m_addrLen;
 	}
 
-	this() @safe nothrow scope {}
-	this(scope sockaddr* addr, socklen_t addr_len) @safe nothrow scope { set(addr, addr_len); }
+@safe nothrow @nogc scope:
 
-	override @property sockaddr* name() scope { return m_addr; }
-	override @property const(sockaddr)* name() const scope { return m_addr; }
-	override @property socklen_t nameLen() const scope { return m_addrLen; }
+	this() {}
+	this(scope sockaddr* addr, socklen_t addr_len) { set(addr, addr_len); }
+
+	override @property sockaddr* name() { return m_addr; }
+	override @property const(sockaddr)* name() const { return m_addr; }
+	override @property socklen_t nameLen() const { return m_addrLen; }
 
 	void set(scope sockaddr* addr, socklen_t addr_len)
-	@trusted nothrow scope {
+	@trusted {
 		// NOTE: the `scope` here really just applied to the scope of the
 		//       RefAddress instance. However, we move the `@trusted` annotation
 		//       here to avoid having to wrap every `addr` parameter passed
@@ -1029,7 +1031,7 @@ final class RefAddress : Address {
 	}
 
 	void cap(socklen_t new_len)
-	scope @safe nothrow {
+	nothrow {
 		assert(new_len <= m_addrLen, "Cannot grow size of a RefAddress.");
 		m_addrLen = new_len;
 	}
