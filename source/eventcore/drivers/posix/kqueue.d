@@ -40,7 +40,7 @@ final class KqueueEventLoop : KqueueEventLoopBase {
 
 abstract class KqueueEventLoopBase : PosixEventLoop {
 	protected {
-		int m_queue;
+		int m_queue = -1;
 		size_t m_changeCount = 0;
 		kevent_t[100] m_changes;
 		kevent_t[100] m_events;
@@ -101,6 +101,7 @@ abstract class KqueueEventLoopBase : PosixEventLoop {
 		super.dispose();
 		import core.sys.posix.unistd : close;
 		close(m_queue);
+		m_queue = -1;
 	}
 
 	override void registerFD(FD fd, EventMask mask, bool edge_triggered = true)
@@ -154,6 +155,10 @@ abstract class KqueueEventLoopBase : PosixEventLoop {
 
 	private void putChange(ref kevent_t ev)
 	@safe nothrow @nogc {
+		if (m_queue == -1) {
+			printWarningWithStackTrace("Warning: generating kqueue event after the driver has been disposed");
+			return;
+		}
 		m_changes[m_changeCount++] = ev;
 		if (m_changeCount == m_changes.length) {
 			auto ret = (() @trusted => kevent(m_queue, &m_changes[0], cast(int)m_changes.length, null, 0, null)) ();

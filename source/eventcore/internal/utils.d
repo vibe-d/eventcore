@@ -27,6 +27,21 @@ void print(ARGS...)(string str, ARGS args)
 	s.r.put('\n');
 }
 
+void printWarningWithStackTrace(ARGS...)(string str, ARGS args)
+@trusted @nogc nothrow {
+	try print(str, args);
+	catch (Exception e) {}
+	debug {
+		try throw new Exception("");
+		catch (Exception e) {
+			try {
+				print("Call stack:");
+				foreach (ln; e.info) print("%s", ln);
+			} catch (Exception e2) {}
+		}
+	}
+}
+
 T mallocT(T, ARGS...)(ARGS args)
 {
 	import core.stdc.stdlib : malloc;
