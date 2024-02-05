@@ -1,17 +1,9 @@
-project('eventcore', 'd',
-	meson_version: '>=0.53',
-	version: '0.9.13',
+project(
+	'eventcore',
+	['d'],
+	license: 'MIT',
+	meson_version: '>=1.3.1',
 )
-
-project_soversion      = '0'
-project_version_suffix = ''
-project_version        = meson.project_version()
-project_version_full   = project_version + project_version_suffix
-
-taggedalgebraic_dep = dependency('taggedalgebraic', version: ['>=0.10.12', '<0.12'])
-
-eventcore_build_versions = []
-eventcore_extra_deps = []
 
 default_driver = 'select'
 host_system = host_machine.system()
@@ -58,41 +50,44 @@ if driver_opt == 'auto'
 	driver_opt = default_driver
 endif
 
+eventcore_build_versions = []
+eventcore_extra_deps = []
+
 if driver_opt == 'epoll' 
 	if not host_is_linux
 		error('epoll driver is only supported on Linux')
 	endif
-	eventcore_build_versions += ['EventcoreEpollDriver']
+	eventcore_build_versions += 'EventcoreEpollDriver'
 	if gaia_dep.found()
-		eventcore_extra_deps += [gaia_dep]
-		eventcore_build_versions += ['EventcoreUseGAIA']
+		eventcore_extra_deps += gaia_dep
+		eventcore_build_versions += 'EventcoreUseGAIA'
 	endif
 elif driver_opt == 'cfrunloop' 
 	if not host_is_osx
 		error('cfrunloop driver is only supported on OSX')
 	endif
-	eventcore_build_versions += ['EventcoreCFRunLoopDriver']
+	eventcore_build_versions += 'EventcoreCFRunLoopDriver'
 elif driver_opt == 'kqueue'
 	if not host_is_bsd
 		error('kqueue driver is only supported on BSD variants (including OSX)')
 	endif
-	eventcore_build_versions += ['EventcoreKqueueDriver']
+	eventcore_build_versions += 'EventcoreKqueueDriver'
 elif driver_opt == 'winapi'
 	if not host_is_windows
 		error('winapi driver is only supported on Windows')
 	endif
-	eventcore_build_versions += ['EventcoreWinAPIDriver']
+	eventcore_build_versions += 'EventcoreWinAPIDriver'
 elif driver_opt == 'select' 
 	if not (host_is_posix or host_is_windows)
 		error('select driver is only supported on POSIX-like systems and Windows')
 	endif
-	eventcore_build_versions += ['EventcoreSelectDriver']
+	eventcore_build_versions += 'EventcoreSelectDriver'
 elif driver_opt == 'libasync' 
 	if not libasync_dep.found()
 		error('libasync could not be found, but is required for the libasync driver')
 	endif
-	eventcore_build_versions += ['EventcoreLibasyncDriver']
-	eventcore_extra_deps += [libasync_dep]
+	eventcore_build_versions += 'EventcoreLibasyncDriver'
+	eventcore_extra_deps += libasync_dep
 elif driver_opt == 'generic'
 	# Defines eventDriver as the generic EventDriver interface. Setup must be done manually.
 else
@@ -109,11 +104,36 @@ summary(
 )
 	
 
-source_root = meson.source_root()
-build_root = meson.build_root()
 subdir('source/eventcore')
+imports_dir = include_directories('source/')
+
+taggedalgebraic_dep = subproject('taggedalgebraic').get_variable('taggedalgebraic_dep')
+
+# to avoid duplication
+eventcore_internal_deps = declare_dependency(
+	include_directories: imports_dir,
+	dependencies: [taggedalgebraic_dep],
+	d_module_versions: eventcore_build_versions,
+)
+
+eventcore_lib = library(
+	'eventcore',
+	sources: eventcore_src,
+	dependencies: [eventcore_internal_deps, eventcore_extra_deps],
+	install: true,
+)
 
 eventcore_dep = declare_dependency(
-	include_directories: include_directories('source'),
-	link_with: eventcore_lib
+	dependencies: eventcore_internal_deps,
+	link_with: eventcore_lib,
 )
+
+test_exe = executable(
+	'eventcore_test',
+	sources: eventcore_src,
+	dependencies: [eventcore_dep, taggedalgebraic_dep, eventcore_extra_deps],
+	d_unittest: true,
+	link_args: '-main',
+)
+
+test('test_eventcore', test_exe)
