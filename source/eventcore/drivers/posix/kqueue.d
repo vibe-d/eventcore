@@ -159,6 +159,19 @@ abstract class KqueueEventLoopBase : PosixEventLoop {
 			printWarningWithStackTrace("Warning: generating kqueue event after the driver has been disposed");
 			return;
 		}
+
+		// if an filter is going to be deleted, remove all earlier entries
+		// from the queue
+		if (ev.flags & EV_DELETE) {
+			size_t j = 0;
+			foreach (i; 0 .. m_changeCount)
+				if (m_changes[i].ident != ev.ident) {
+					if (i != j) m_changes[j] = m_changes[i];
+					j++;
+				}
+			m_changeCount = j;
+		}
+
 		m_changes[m_changeCount++] = ev;
 		if (m_changeCount == m_changes.length) {
 			auto ret = (() @trusted => kevent(m_queue, &m_changes[0], cast(int)m_changes.length, null, 0, null)) ();
