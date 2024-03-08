@@ -109,36 +109,39 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 
 		if (!m_loop) return true;
 
-		static string getThreadName()
-		{
-			string thname;
-			try thname = Thread.getThis().name;
-			catch (Exception e) assert(false, e.msg);
-			return thname.length ? thname : "unknown";
-		}
-
-		bool hasPrintedHeader;
-		foreach (id, ref s; m_loop.m_fds) {
-			if (!s.specific.hasType!(typeof(null)) && !(s.common.flags & FDFlags.internal)
-				&& (!s.specific.hasType!(StreamSocketSlot) || s.streamSocket.state == ConnectionState.connected))
+		version (EventCoreSilenceLeakWarnings) {}
+		else {
+			static string getThreadName()
 			{
-				if (!hasPrintedHeader) {
-					print("Warning (thread: %s): leaking eventcore driver because there are still active handles", getThreadName());
-					hasPrintedHeader = true;
-				}
-				print("  FD %s (%s)", id, s.specific.kind);
-				debug (EventCoreLeakTrace) {
-					import std.array : replace;
-					string origin_str = s.common.origin.toString();
-					print("    Created by;\n      %s",
-						origin_str.replace("\n","\n      "));
+				string thname;
+				try thname = Thread.getThis().name;
+				catch (Exception e) assert(false, e.msg);
+				return thname.length ? thname : "unknown";
+			}
+
+			bool hasPrintedHeader;
+			foreach (id, ref s; m_loop.m_fds) {
+				if (!s.specific.hasType!(typeof(null)) && !(s.common.flags & FDFlags.internal)
+					&& (!s.specific.hasType!(StreamSocketSlot) || s.streamSocket.state == ConnectionState.connected))
+				{
+					if (!hasPrintedHeader) {
+						print("Warning (thread: %s): leaking eventcore driver because there are still active handles", getThreadName());
+						hasPrintedHeader = true;
+					}
+					print("  FD %s (%s)", id, s.specific.kind);
+					debug (EventCoreLeakTrace) {
+						import std.array : replace;
+						string origin_str = s.common.origin.toString();
+						print("    Created by;\n      %s",
+							origin_str.replace("\n","\n      "));
+					}
 				}
 			}
-		}
-		debug (EventCoreLeakTrace) {}
-		else {
-			if (hasPrintedHeader)
-					print("Use '-debug=EventCoreLeakTrace' to show where the instantiation happened");
+			debug (EventCoreLeakTrace) {}
+			else {
+				if (hasPrintedHeader)
+						print("Use '-debug=EventCoreLeakTrace' to show where the instantiation happened");
+			}
 		}
 
 		if (m_loop.m_handleCount > 0)
