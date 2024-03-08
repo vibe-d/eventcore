@@ -130,10 +130,8 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 					}
 					print("  FD %s (%s)", id, s.specific.kind);
 					debug (EventCoreLeakTrace) {
-						import std.array : replace;
-						string origin_str = s.common.origin.toString();
-						print("    Created by;\n      %s",
-							origin_str.replace("\n","\n      "));
+						print("    Created by:");
+						printStackTrace(s.common.origin);
 					}
 				}
 			}
