@@ -6,7 +6,7 @@ import eventcore.driver;
 import eventcore.drivers.winapi.core;
 import eventcore.internal.win32;
 import eventcore.internal.consumablequeue;
-import eventcore.internal.utils : mallocT, freeT, nogc_assert, print;
+import eventcore.internal.utils : mallocT, freeT, nogc_assert, print, printStackTrace;
 
 
 final class WinAPIEventDriverEvents : EventDriverEvents {
@@ -20,6 +20,9 @@ final class WinAPIEventDriverEvents : EventDriverEvents {
 		static struct EventSlot {
 			uint refCount;
 			ConsumableQueue!EventCallback waiters;
+			debug (EventCoreLeakTrace) {
+				Throwable.TraceInfo origin;
+			}
 		}
 
 		WinAPIEventDriverCore m_core;
@@ -34,7 +37,7 @@ final class WinAPIEventDriverEvents : EventDriverEvents {
 	@nogc {
 		m_core = core;
 		m_event = () @trusted { return CreateEvent(null, false, false, null); } ();
-		m_pending = mallocT!(ConsumableQueue!Trigger); // FIXME: avoid GC allocation
+		m_pending = mallocT!(ConsumableQueue!Trigger);
 		InitializeCriticalSection(&m_mutex);
 		m_core.registerEvent(m_event, &triggerPending);
 	}
@@ -49,11 +52,20 @@ final class WinAPIEventDriverEvents : EventDriverEvents {
 
 	package bool checkForLeakedHandles()
 	@trusted {
-		foreach (evt; m_events.byKey) {
+		if (m_events.byKey.empty)
+			return false;
+		synchronized {
 			print("Warning: Event handles leaked at driver shutdown.");
-			return true;
+			foreach (kv; m_events.byKeyValue) {
+				debug (EventCoreLeakTrace) {
+					print("  Event %s allocated from:", kv.key, kv.value.origin);
+					printStackTrace(kv.value.origin);
+				} else {
+					print("  Event %s", kv.key);
+				}
+			}
 		}
-		return false;
+		return true;
 	}
 
 	override EventID create()
@@ -61,6 +73,10 @@ final class WinAPIEventDriverEvents : EventDriverEvents {
 		auto id = EventID(m_idCounter++, 0);
 		if (id == EventID.invalid) id = EventID(m_idCounter++, 0);
 		m_events[id] = EventSlot(1, new ConsumableQueue!EventCallback); // FIXME: avoid GC allocation
+		debug (EventCoreLeakTrace) {
+			import core.runtime : defaultTraceHandler;
+			m_events[id].origin = defaultTraceHandler(null);
+		}
 		return id;
 	}
 
