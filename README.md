@@ -60,7 +60,65 @@ Processes             | yes    | yes   | &mdash; | yes     | yes       | &mdash;
 ² Systems other than Linux use a polling implementation
 
 
-### Open questions
+Compile-time configuration
+--------------------------
+
+### Configurations
+
+The DUB configuration meachnism can be used to force choosing a particular
+event driver implementation. The following configurations are available:
+
+`EventcoreCFRunLoopDriver`: Forces using the CFRunLoop driver (for DUB, use the "cfrunloop" configuration instead)
+`EventcoreKqueueDriver`: Forces using the kqueue driver (for DUB, use the "kqueue" configuration instead)
+`EventcoreWinAPIDriver`: Forces using the WinAPI driver (for DUB, use the "winapi" configuration instead)
+`EventcoreLibasyncDriver`: Forces using the libasync driver (for DUB, use the "libasync" configuration instead)
+`EventcoreSelectDriver`: Forces using the select driver (for DUB, use the "select" configuration instead)
+`EventcoreUseGAIA`: Forces using getaddressinfo_a for the epoll driver (for DUB, use the "epoll-gaia" configuration instead)
+
+
+### Version identifiers
+
+Several version identifiers can be set to configure the behavior of the library
+at compile time. Simply insert any of the following identifiers as a "version"
+to the compiler command line or into your DUB recipe:
+
+dub.sdl:
+```SDL
+versions "EventCoreSilenceLeakWarnings"
+```
+
+dub.json:
+```JSON
+{
+	...
+	"versions": ["EventCoreSilenceLeakWarnings"]
+	...
+}
+```
+
+- `EventCoreSilenceLeakWarnings`: Disables checking for leaked handles at shutdown
+- `EventcoreCFRunLoopDriver`: Forces using the CFRunLoop driver (for DUB, use the "cfrunloop" configuration instead)
+- `EventcoreKqueueDriver`: Forces using the kqueue driver (for DUB, use the "kqueue" configuration instead)
+- `EventcoreWinAPIDriver`: Forces using the WinAPI driver (for DUB, use the "winapi" configuration instead)
+- `EventcoreLibasyncDriver`: Forces using the libasync driver (for DUB, use the "libasync" configuration instead)
+- `EventcoreSelectDriver`: Forces using the select driver (for DUB, use the "select" configuration instead)
+- `EventcoreUseGAIA`: Forces using getaddressinfo_a for the epoll driver (for DUB, use the "epoll-gaia" configuration instead)
+
+
+### Debug identifiers
+
+For additional debug output, the following debug identifiers are available. When
+building with DUB, you can specify them similar to version identifiers, but using
+the `debugVersions` directive instead:
+
+- `EventCoreLogDNS`: Prints detailed information about DNS lookups
+- `EventCoreLeakTrace`: Gathers stack traces when allocating handles to assist in fixing leaked handles
+- `EventCoreEpollDebug`: Outputs epoll event details
+- `EventCoreLogFiles`: Outputs detailed logging for file operations carried out through the `threadedfile` implementation
+
+
+Open questions
+--------------
 
 - Error code reporting
 - Enqueued writes
