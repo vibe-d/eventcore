@@ -348,11 +348,10 @@ final class PosixEventDriverProcesses(Loop : PosixEventLoop) : EventDriverProces
 		while (true) {
 			siginfo_t dummy;
 
-			version (Android) {
-				// P_ALL is defined as 0 on android
-				auto ret = waitid(0, -1, &dummy, WEXITED|WNOWAIT);
-			} else {
+			static if (is(idtype_t)) {
 				auto ret = waitid(idtype_t.P_ALL, -1, &dummy, WEXITED|WNOWAIT);
+			} else {
+				auto ret = waitid(0, -1, &dummy, WEXITED|WNOWAIT);
 			}
 
 			if (ret == -1) {
