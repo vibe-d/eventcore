@@ -42,6 +42,14 @@ void printWarningWithStackTrace(ARGS...)(string str, ARGS args)
 	}
 }
 
+void printStackTrace(Throwable.TraceInfo trace)
+{
+	import std.string : lineSplitter;
+	string origin_str = trace.toString();
+	foreach (ln; origin_str.lineSplitter)
+		print("      %s", ln);
+}
+
 T mallocT(T, ARGS...)(ARGS args)
 {
 	import core.stdc.stdlib : malloc;

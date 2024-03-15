@@ -5,7 +5,7 @@ version (Windows):
 import eventcore.driver;
 import eventcore.drivers.timer;
 import eventcore.internal.consumablequeue;
-import eventcore.internal.utils : mallocT, freeT, nogc_assert, print;
+import eventcore.internal.utils : mallocT, freeT, nogc_assert, print, printStackTrace;
 import eventcore.internal.win32;
 import core.sync.mutex : Mutex;
 import core.time : Duration;
@@ -74,8 +74,13 @@ final class WinAPIEventDriverCore : EventDriverCore {
 		foreach (k; m_handles.byKey) {
 			print("Warning (thread: %s): Leaked handles detected at driver shutdown", getThreadName());
 			foreach (ks; m_handles.byKeyValue)
-				if (!ks.value.specific.hasType!(typeof(null)))
+				if (!ks.value.specific.hasType!(typeof(null))) {
 					print("   FD %04X (%s)", ks.key, ks.value.specific.kind);
+					debug (EventCoreLeakTrace) {
+						print("    Created by:");
+						printStackTrace(ks.value.origin);
+					}
+				}
 			return true;
 		}
 
@@ -257,6 +262,10 @@ final class WinAPIEventDriverCore : EventDriverCore {
 		s.refCount = 1;
 		s.validationCounter = ++m_validationCounter;
 		s.specific = SlotType.init;
+		debug (EventCoreLeakTrace) {
+			import core.runtime : defaultTraceHandler;
+			s.origin = defaultTraceHandler(null);
+		}
 		m_handles[h] = s;
 		return () @trusted { return &m_handles[h].specific.get!SlotType(); } ();
 	}
@@ -311,6 +320,10 @@ private struct HandleSlot {
 
 	DataInitializer userDataDestructor;
 	ubyte[16*size_t.sizeof] userData;
+
+	debug (EventCoreLeakTrace) {
+		Throwable.TraceInfo origin;
+	}
 
 	@safe nothrow:
 
