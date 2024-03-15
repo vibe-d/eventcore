@@ -164,9 +164,8 @@ abstract class KqueueEventLoopBase : PosixEventLoop {
 			auto ret = (() @trusted => kevent(m_queue, &m_changes[0], cast(int)m_changes.length, null, 0, null)) ();
 			debug {
 				import core.stdc.errno : errno;
-				import std.format : format;
-				try assert(ret == 0, format("Failed to place kqueue change: %s %s", ret, errno));
-				catch (Exception e) assert(false, "kqueue call for flushing changes failed");
+				if (ret != 0)
+					printWarningWithStackTrace("Failed to place kqueue changes: %s %s", ret, errno);
 			}
 			m_changeCount = 0;
 		}
