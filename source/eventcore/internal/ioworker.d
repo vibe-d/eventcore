@@ -31,7 +31,9 @@ struct IOWorkerPool {
 
 	auto run(alias fun, ARGS...)(ARGS args)
 	{
-		auto task = StaticTaskPool.allocTask!(fun, ARGS)(args);
+		import core.lifetime : forward;
+
+		auto task = StaticTaskPool.allocTask!(fun, ARGS)(forward!args);
 		try m_pool.put(task);
 		catch (Exception e) assert(false, e.msg);
 		return task;

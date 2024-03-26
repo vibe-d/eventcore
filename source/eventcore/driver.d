@@ -504,7 +504,7 @@ interface EventDriverFiles {
 		needs to make sure that either `on_read_finish` got called, or
 		`cancelRead` was called before issuing the next call to `read`.
 	*/
-	void write(FileFD file, ulong offset, const(ubyte)[] buffer, IOMode mode, FileIOCallback on_write_finish);
+	void write(FileFD file, ulong offset, return const(ubyte)[] buffer, IOMode mode, return FileIOCallback on_write_finish);
 
 	/** Cancels an ongoing write operation.
 
@@ -519,7 +519,7 @@ interface EventDriverFiles {
 		needs to make sure that either `on_read_finish` got called, or
 		`cancelRead` was called before issuing the next call to `read`.
 	*/
-	void read(FileFD file, ulong offset, ubyte[] buffer, IOMode mode, FileIOCallback on_read_finish);
+	void read(FileFD file, ulong offset, return ubyte[] buffer, IOMode mode, return FileIOCallback on_read_finish);
 
 	/** Cancels an ongoing read operation.
 
