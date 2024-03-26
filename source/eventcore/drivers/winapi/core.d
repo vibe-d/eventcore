@@ -199,7 +199,7 @@ final class WinAPIEventDriverCore : EventDriverCore {
 
 		DWORD timeout_msecs = max_wait == Duration.max ? INFINITE : cast(DWORD)min(max(max_wait.total!"msecs", 0), DWORD.max);
 		auto ret = () @trusted { return MsgWaitForMultipleObjectsEx(m_registeredEventCount, m_registeredEvents.ptr,
-			timeout_msecs, QS_ALLEVENTS, MWMO_ALERTABLE|MWMO_INPUTAVAILABLE); } ();
+			timeout_msecs, QS_ALLINPUT, MWMO_ALERTABLE|MWMO_INPUTAVAILABLE); } ();
 
 		while (!m_ioEvents.empty) {
 			auto evt = m_ioEvents.consumeOne();
