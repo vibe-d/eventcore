@@ -14,6 +14,8 @@ import eventcore.drivers.posix.sockets;
 import eventcore.drivers.posix.watchers;
 import eventcore.drivers.posix.processes;
 import eventcore.drivers.posix.pipes;
+import eventcore.drivers.posix.io_uring.io_uring;
+import eventcore.drivers.posix.io_uring.files;
 import eventcore.drivers.timer;
 import eventcore.drivers.threadedfile;
 import eventcore.internal.consumablequeue : ConsumableQueue;
@@ -37,12 +39,17 @@ private long currStdTime()
 	return Clock.currStdTime;
 }
 
+version(EventcoreEpollUsesUring) {
+	version (EventcoreEpollDriver) {}
+	else { static assert(false, "uring only supported together with epoll for now"); }
+}
+
 final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 @safe: /*@nogc:*/ nothrow:
 
 
 	private {
-		alias CoreDriver = PosixEventDriverCore!(Loop, TimerDriver, EventsDriver, ProcessDriver);
+		alias CoreDriver = PosixEventDriverCore!(Loop, TimerDriver, EventsDriver, ProcessDriver, UringCore);
 		alias EventsDriver = PosixEventDriverEvents!(Loop, SocketsDriver);
 		version (linux) alias SignalsDriver = SignalFDEventDriverSignals!Loop;
 		else alias SignalsDriver = DummyEventDriverSignals!Loop;
@@ -51,7 +58,8 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 		version (Windows) alias DNSDriver = EventDriverDNS_GHBN!(EventsDriver, SignalsDriver);
 		else version (EventcoreUseGAIA) alias DNSDriver = EventDriverDNS_GAIA!(EventsDriver, SignalsDriver);
 		else alias DNSDriver = EventDriverDNS_GAI!(EventsDriver, SignalsDriver);
-		alias FileDriver = ThreadedFileEventDriver!(EventsDriver, CoreDriver);
+		version (EventcoreEpollUsesUring) alias FileDriver = UringDriverFiles;
+		else alias FileDriver = ThreadedFileEventDriver!(EventsDriver, CoreDriver);
 		version (Posix) alias PipeDriver = PosixEventDriverPipes!Loop;
 		else alias PipeDriver = DummyEventDriverPipes!Loop;
 		version (linux) alias WatcherDriver = InotifyEventDriverWatchers!EventsDriver;
@@ -59,8 +67,11 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 		else alias WatcherDriver = PollEventDriverWatchers!EventsDriver;
 		version (Posix) alias ProcessDriver = PosixEventDriverProcesses!Loop;
 		else alias ProcessDriver = DummyEventDriverProcesses!Loop;
+		version (EventcoreEpollUsesUring) alias UringCore = UringEventLoop;
+		else alias UringCore = NoRing;
 
 		Loop m_loop;
+		UringCore m_uring;
 		CoreDriver m_core;
 		EventsDriver m_events;
 		SignalsDriver m_signals;
@@ -76,15 +87,17 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 	this()
 	@nogc @trusted {
 		m_loop = mallocT!Loop;
+		m_uring = mallocT!UringCore;
 		m_sockets = mallocT!SocketsDriver(m_loop);
 		m_events = mallocT!EventsDriver(m_loop, m_sockets);
 		m_signals = mallocT!SignalsDriver(m_loop);
 		m_timers = mallocT!TimerDriver;
 		m_pipes = mallocT!PipeDriver(m_loop);
 		m_processes = mallocT!ProcessDriver(m_loop, this);
-		m_core = mallocT!CoreDriver(m_loop, m_timers, m_events, m_processes);
+		m_core = mallocT!CoreDriver(m_loop, m_timers, m_events, m_processes, m_uring);
 		m_dns = mallocT!DNSDriver(m_events, m_signals);
-		m_files = mallocT!FileDriver(m_events, m_core);
+		version (EventcoreEpollUsesUring) m_files = mallocT!FileDriver(m_uring);
+		else m_files = mallocT!FileDriver(m_events, m_core);
 		m_watchers = mallocT!WatcherDriver(m_events);
 	}
 
@@ -171,7 +184,8 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 }
 
 
-final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTimers, Events : EventDriverEvents, Processes : EventDriverProcesses) : EventDriverCore {
+final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTimers, Events : EventDriverEvents, Processes : EventDriverProcesses, Uring)
+	: EventDriverCore {
 @safe nothrow:
 	import core.atomic : atomicLoad, atomicStore;
 	import core.sync.mutex : Mutex;
@@ -188,6 +202,7 @@ final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTime
 		Timers m_timers;
 		Events m_events;
 		Processes m_processes;
+		Uring m_uring;
 		bool m_exit = false;
 		EventID m_wakeupEvent;
 
@@ -195,7 +210,8 @@ final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTime
 		ConsumableQueue!ThreadCallbackEntry m_threadCallbacks;
 	}
 
-	this(Loop loop, Timers timers, Events events, Processes processes)
+	this(Loop loop, Timers timers, Events events, Processes processes,
+		Uring uring)
 	@nogc {
 		m_loop = loop;
 		m_timers = timers;
@@ -205,6 +221,8 @@ final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTime
         m_threadCallbackMutex = mallocT!(shared(Mutex));
 		m_threadCallbacks = mallocT!(ConsumableQueue!ThreadCallbackEntry);
 		m_threadCallbacks.reserve(1000);
+		m_uring = uring;
+		m_uring.registerEventID(m_wakeupEvent);
 	}
 
 	final void dispose()
@@ -218,7 +236,9 @@ final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTime
 		} catch (Exception e) assert(false, e.msg);
 	}
 
-	@property size_t waiterCount() const { return m_loop.m_waiterCount + m_timers.pendingCount + m_processes.pendingCount; }
+	@property size_t waiterCount() const {
+		return m_loop.m_waiterCount + m_timers.pendingCount + m_processes.pendingCount + m_uring.waiterCount;
+	}
 
 	@property Loop loop() { return m_loop; }
 
@@ -236,12 +256,17 @@ final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTime
 		if (!waiterCount) {
 			return ExitReason.outOfWaiters;
 		}
-
+		version (EventcoreEpollUsesUring) {
+			// this is required to make the kernel aware of
+			// submitted SEQ, otherwise the first call to
+			// process events could stall
+			m_uring.submit;
+		}
 		bool got_events;
-
 		if (timeout <= 0.seconds) {
 			got_events = m_loop.doProcessEvents(0.seconds);
 			m_timers.process(MonoTime.currTime);
+			version (EventcoreEpollUsesUring) got_events |= m_uring.doProcessEvents(0.seconds);
 		} else {
 			auto now = MonoTime.currTime;
 			do {
@@ -250,6 +275,7 @@ final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTime
 				auto prev_step = now;
 				now = MonoTime.currTime;
 				got_events |= m_timers.process(now);
+				version(EventcoreEpollUsesUring) got_events |= m_uring.doProcessEvents(0.seconds);
 				if (timeout != Duration.max)
 					timeout -= now - prev_step;
 			} while (timeout > 0.seconds && !m_exit && !got_events);
