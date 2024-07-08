@@ -55,8 +55,10 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 		version (Posix) alias PipeDriver = PosixEventDriverPipes!Loop;
 		else alias PipeDriver = DummyEventDriverPipes!Loop;
 		version (linux) alias WatcherDriver = InotifyEventDriverWatchers!EventsDriver;
-		else version (EventcoreCFRunLoopDriver) alias WatcherDriver = FSEventsEventDriverWatchers!EventsDriver;
-		else alias WatcherDriver = PollEventDriverWatchers!EventsDriver;
+		else version (EventcoreCFRunLoopDriver) {
+			version (OSX) alias WatcherDriver = FSEventsEventDriverWatchers!EventsDriver;
+			else alias WatcherDriver = PollEventDriverWatchers!EventsDriver;
+		} else alias WatcherDriver = PollEventDriverWatchers!EventsDriver;
 		version (Posix) alias ProcessDriver = PosixEventDriverProcesses!Loop;
 		else alias ProcessDriver = DummyEventDriverProcesses!Loop;
 
