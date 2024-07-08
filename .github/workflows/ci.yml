@@ -15,22 +15,22 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                os: [ubuntu-latest, windows-latest, macOS-latest]
+                os: [ubuntu-latest, windows-latest, macos-13]
                 dc: [dmd-latest, ldc-latest, dmd-2.086.0, ldc-1.16.0, ldc-1.17.0]
                 arch: [x86_64]
                 config: [select, epoll, cfrunloop, winapi]
                 exclude:
                   - {os: ubuntu-latest, config: cfrunloop}
                   - {os: ubuntu-latest, config: winapi}
-                  - {os: macOS-latest, config: epoll}
-                  - {os: macOS-latest, config: winapi}
+                  - {os: macos-13, config: epoll}
+                  - {os: macos-13, config: winapi}
                   - {os: windows-latest, config: cfrunloop}
                   - {os: windows-latest, config: epoll}
                   # macOS fails up to FE 2.086.x, so we test on a slightly newer
                   # version instead
                   # "dyld: lazy symbol binding failed: Symbol not found: _dyld_enumerate_tlv_storage"
-                  - {os: macOS-latest, dc: dmd-2.086.0}
-                  - {os: macOS-latest, dc: ldc-1.16.0}
+                  - {os: macos-13, dc: dmd-2.086.0}
+                  - {os: macos-13, dc: ldc-1.16.0}
                   - {os: windows-latest, dc: ldc-1.16.0, config: select}
                   - {os: windows-latest, dc: ldc-1.17.0}
                   - {os: ubuntu-latest, dc: ldc-1.17.0}
@@ -40,10 +40,10 @@ jobs:
 
         runs-on: ${{ matrix.os }}
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
 
             - name: Install D compiler
-              uses: dlang-community/setup-dlang@v1
+              uses: dlang-community/setup-dlang@v2
               with:
                   compiler: ${{ matrix.dc }}
 

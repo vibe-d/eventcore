@@ -4,7 +4,6 @@ module eventcore.drivers.posix.watchers;
 import eventcore.driver;
 import eventcore.drivers.posix.driver;
 import eventcore.internal.utils : mallocT, freeT, nogc_assert;
-import eventcore.internal.corefoundation : isAppleOS;
 
 
 final class InotifyEventDriverWatchers(Events : EventDriverEvents) : EventDriverWatchers
@@ -201,7 +200,7 @@ final class InotifyEventDriverWatchers(Events : EventDriverEvents) : EventDriver
 	}
 }
 
-static if (isAppleOS)
+version (OSX) // NOTE: Although this works on iOS, too, this is a private API there
 final class FSEventsEventDriverWatchers(Events : EventDriverEvents) : EventDriverWatchers {
 @safe: /*@nogc:*/ nothrow:
 	import eventcore.internal.corefoundation;
