@@ -245,7 +245,7 @@ interface EventDriverSockets {
 		---
 		scope storage = new UnknownAddress;
 		scope sockaddr = new RefAddress(storage.name, storage.nameLen);
-		eventDriver.sockets.getLocalAddress(sock, sockaddr);
+		eventDriver.sockets.getRemoteAddress(sock, sockaddr);
 		---
 	*/
 	bool getRemoteAddress(SocketFD sock, scope RefAddress dst);
