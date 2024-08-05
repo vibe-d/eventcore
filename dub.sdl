@@ -44,10 +44,12 @@ configuration "select" {
 	versions "EventcoreSelectDriver"
 }
 
-configuration "libasync" {
-	dependency "libasync" version="~>0.8.2"
+// TODO: The implementation is currently just a bunch of stubs, uncomment once
+//       we have a minimal set of functionality actually available.
+/*configuration "libasync" {
+	dependency "libasync" version="~>0.8.2" optional=true default=false
 	versions "EventcoreLibasyncDriver"
-}
+}*/
 
 configuration "generic" {
 	// Defines eventDriver as the generic EventDriver interface. Setup must be done manually.
