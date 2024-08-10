@@ -18,7 +18,6 @@ final class LoopTimeoutTimerDriver : EventDriverTimers {
 	import core.memory : GC;
 
 	private {
-		TimerSlot*[TimerID] m_timers;
 		StackDList!TimerSlot m_timerQueue;
 		StackDList!TimerSlot m_freeList;
 		TimerID m_lastTimerID;
@@ -80,8 +79,8 @@ final class LoopTimeoutTimerDriver : EventDriverTimers {
 			auto cb = tm.callback;
 			tm.callback = null;
 			if (cb) {
-				cb(tm.id, true);
-				releaseRef(tm.id);
+				cb(toID(tm), true);
+				releaseRef(toID(tm));
 			}
 		}
 
@@ -90,7 +89,6 @@ final class LoopTimeoutTimerDriver : EventDriverTimers {
 
 	final override TimerID create()
 	@trusted {
-		auto id = TimerID(++m_lastTimerID, 0);
 		TimerSlot* tm;
 		if (m_freeList.empty) {
 			try tm = Mallocator.instance.make!TimerSlot;
@@ -101,15 +99,17 @@ final class LoopTimeoutTimerDriver : EventDriverTimers {
 			tm = m_freeList.front;
 			m_freeList.removeFront();
 		}
-		tm.id = id;
+		if (!++tm.validationCounter)
+			tm.validationCounter++;
 		tm.refCount = 1;
 		tm.pending = false;
 		tm.timeout = MonoTime.max;
 		tm.repeatDuration = Duration.zero;
 		tm.callback = null;
 		tm.userDataDestructor = null;
-		m_timers[id] = tm;
-		return id;
+		auto ret = toID(tm);
+		assert(isValid(ret));
+		return ret;
 	}
 
 	final override void set(TimerID timer, Duration timeout, Duration repeat)
@@ -117,7 +117,7 @@ final class LoopTimeoutTimerDriver : EventDriverTimers {
 		if (!isValid(timer)) return;
 
 		scope (failure) assert(false);
-		auto tm = m_timers[timer];
+		auto tm = fromID(timer);
 		if (tm.pending) stop(timer);
 		tm.timeout = MonoTime.currTime + timeout;
 		tm.repeatDuration = repeat;
@@ -131,7 +131,7 @@ final class LoopTimeoutTimerDriver : EventDriverTimers {
 
 		if (!isValid(timer)) return;
 
-		auto tm = m_timers[timer];
+		auto tm = fromID(timer);
 		if (!tm.pending) return;
 		TimerCallback2 cb;
 		swap(cb, tm.callback);
@@ -147,22 +147,22 @@ final class LoopTimeoutTimerDriver : EventDriverTimers {
 	{
 		if (!isValid(descriptor)) return false;
 
-		return m_timers[descriptor].pending;
+		return fromID(descriptor).pending;
 	}
 
 	final override bool isPeriodic(TimerID descriptor)
 	{
 		if (!isValid(descriptor)) return false;
 
-		return m_timers[descriptor].repeatDuration > Duration.zero;
+		return fromID(descriptor).repeatDuration > Duration.zero;
 	}
 
 	final override void wait(TimerID timer, TimerCallback2 callback)
 	{
 		if (!isValid(timer)) return;
 
-		assert(!m_timers[timer].callback, "Calling wait() on a timer that is already waiting.");
-		m_timers[timer].callback = callback;
+		assert(!fromID(timer).callback, "Calling wait() on a timer that is already waiting.");
+		fromID(timer).callback = callback;
 		addRef(timer);
 	}
 	alias wait = EventDriverTimers.wait;
@@ -171,35 +171,35 @@ final class LoopTimeoutTimerDriver : EventDriverTimers {
 	{
 		if (!isValid(timer)) return;
 
-		auto pt = m_timers[timer];
+		auto pt = fromID(timer);
 		assert(pt.callback);
 		pt.callback = null;
 		releaseRef(timer);
 	}
 
-	override bool isValid(TimerID handle)
+	override bool isValid(TimerID descriptor)
 	const {
-		return (handle in m_timers) !is null;
+		return fromID(descriptor) !is null;
 	}
 
 	final override void addRef(TimerID descriptor)
 	{
 		if (!isValid(descriptor)) return;
 
-		m_timers[descriptor].refCount++;
+		fromID(descriptor).refCount++;
 	}
 
 	final override bool releaseRef(TimerID descriptor)
 	{
 		if (!isValid(descriptor)) return true;
 
-		auto tm = m_timers[descriptor];
+		auto tm = fromID(descriptor);
 		tm.refCount--;
 
 		// cancel starved timer waits
 		if (tm.callback && tm.refCount == 1 && !tm.pending) {
 			debug addRef(descriptor);
-			cancelWait(tm.id);
+			cancelWait(toID(tm));
 			debug {
 				assert(tm.refCount == 1);
 				releaseRef(descriptor);
@@ -208,8 +208,9 @@ final class LoopTimeoutTimerDriver : EventDriverTimers {
 		}
 
 		if (!tm.refCount) {
-			if (tm.pending) stop(tm.id);
-			m_timers.remove(descriptor);
+			if (tm.pending) stop(toID(tm));
+			tm.validationCounter = 0;
+			assert(!isValid(descriptor));
 			m_freeList.insertFront(tm);
 
 			return false;
@@ -222,14 +223,14 @@ final class LoopTimeoutTimerDriver : EventDriverTimers {
 	const {
 		if (!isValid(descriptor)) return false;
 
-		return m_timers[descriptor].refCount == 1;
+		return fromID(descriptor).refCount == 1;
 	}
 
 	protected final override void* rawUserData(TimerID descriptor, size_t size, DataInitializer initialize, DataInitializer destroy)
 	@system {
 		if (!isValid(descriptor)) return null;
 
-		TimerSlot* fds = m_timers[descriptor];
+		TimerSlot* fds = fromID(descriptor);
 		assert(fds.userDataDestructor is null || fds.userDataDestructor is destroy,
 			"Requesting user data with differing type (destructor).");
 		assert(size <= TimerSlot.userData.length, "Requested user data is too large.");
@@ -253,12 +254,27 @@ final class LoopTimeoutTimerDriver : EventDriverTimers {
 		if (ns) m_timerQueue.insertAfter(tm, ns);
 		else m_timerQueue.insertFront(tm);
 	}
+
+	private static TimerID toID(TimerSlot* slot)
+	@trusted nothrow @nogc {
+		assert(slot.validationCounter != 0);
+		return TimerID(cast(size_t)cast(void*)slot, slot.validationCounter);
+	}
+
+	private static TimerSlot* fromID(TimerID id)
+	@trusted nothrow @nogc {
+		if (id == TimerID.invalid) return null;
+		auto slot = cast(TimerSlot*)cast(void*)id.value;
+		if (slot.validationCounter != id.validationCounter)
+			return null;
+		return slot;
+	}
 }
 
 struct TimerSlot {
 	TimerSlot* prev, next;
-	TimerID id;
 	uint refCount;
+	uint validationCounter;
 	bool pending;
 	MonoTime timeout;
 	Duration repeatDuration;
