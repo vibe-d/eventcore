@@ -10,8 +10,6 @@ import eventcore.internal.utils : mallocT, freeT, nogc_assert;
 import core.time : Duration, MonoTime, hnsecs;
 
 final class LoopTimeoutTimerDriver : EventDriverTimers {
-	import std.experimental.allocator.building_blocks.free_list;
-	import std.experimental.allocator.building_blocks.region;
 	import std.experimental.allocator.mallocator;
 	import std.experimental.allocator : dispose, make;
 	import std.container.array;
@@ -20,16 +18,11 @@ final class LoopTimeoutTimerDriver : EventDriverTimers {
 	import core.memory : GC;
 
 	private {
-		static FreeList!(Mallocator, TimerSlot.sizeof) ms_allocator;
 		TimerSlot*[TimerID] m_timers;
 		StackDList!TimerSlot m_timerQueue;
+		StackDList!TimerSlot m_freeList;
 		TimerID m_lastTimerID;
 		ConsumableQueue!(TimerSlot*) m_firedTimers;
-	}
-
-	static this()
-	{
-		ms_allocator.parent = Mallocator.instance;
 	}
 
 	this()
@@ -39,6 +32,16 @@ final class LoopTimeoutTimerDriver : EventDriverTimers {
 
 	~this()
 	@nogc @trusted nothrow {
+		while (!m_freeList.empty) {
+			auto tm = m_freeList.front;
+			m_freeList.removeFront();
+			() @trusted {
+				scope (failure) assert(false);
+				Mallocator.instance.dispose(tm);
+				GC.removeRange(tm);
+			} ();
+		}
+
 		try freeT(m_firedTimers);
 		catch (Exception e) assert(false, e.msg);
 	}
@@ -89,13 +92,22 @@ final class LoopTimeoutTimerDriver : EventDriverTimers {
 	@trusted {
 		auto id = TimerID(++m_lastTimerID, 0);
 		TimerSlot* tm;
-		try tm = ms_allocator.make!TimerSlot;
-		catch (Exception e) return TimerID.invalid;
-		assert(tm !is null);
-		GC.addRange(tm, TimerSlot.sizeof, typeid(TimerSlot));
+		if (m_freeList.empty) {
+			try tm = Mallocator.instance.make!TimerSlot;
+			catch (Exception e) return TimerID.invalid;
+			assert(tm !is null);
+			GC.addRange(tm, TimerSlot.sizeof, typeid(TimerSlot));
+		} else {
+			tm = m_freeList.front;
+			m_freeList.removeFront();
+		}
 		tm.id = id;
 		tm.refCount = 1;
+		tm.pending = false;
 		tm.timeout = MonoTime.max;
+		tm.repeatDuration = Duration.zero;
+		tm.callback = null;
+		tm.userDataDestructor = null;
 		m_timers[id] = tm;
 		return id;
 	}
@@ -198,11 +210,7 @@ final class LoopTimeoutTimerDriver : EventDriverTimers {
 		if (!tm.refCount) {
 			if (tm.pending) stop(tm.id);
 			m_timers.remove(descriptor);
-			() @trusted {
-				scope (failure) assert(false);
-				ms_allocator.dispose(tm);
-				GC.removeRange(tm);
-			} ();
+			m_freeList.insertFront(tm);
 
 			return false;
 		}
