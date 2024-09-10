@@ -52,6 +52,9 @@ final class WinAPIEventDriverCore : EventDriverCore {
 
 	void dispose()
 	@trusted {
+		if (m_waiterCount > 0)
+			print("Warning (thread: %s): Disposing eventcore driver with active waiters still present", getThreadName());
+
 		try {
 			freeT(m_threadCallbacks);
 			freeT(m_threadCallbackMutex);
@@ -61,16 +64,6 @@ final class WinAPIEventDriverCore : EventDriverCore {
 
 	package bool checkForLeakedHandles()
 	@trusted {
-		import core.thread : Thread;
-
-		static string getThreadName()
-		{
-			string thname;
-			try thname = Thread.getThis().name;
-			catch (Exception e) assert(false, e.msg);
-			return thname.length ? thname : "unknown";
-		}
-
 		foreach (k; m_handles.byKey) {
 			print("Warning (thread: %s): Leaked handles detected at driver shutdown", getThreadName());
 			foreach (ks; m_handles.byKeyValue)
@@ -85,6 +78,16 @@ final class WinAPIEventDriverCore : EventDriverCore {
 		}
 
 		return false;
+	}
+
+	private static string getThreadName()
+	{
+		import core.thread : Thread;
+
+		string thname;
+		try thname = Thread.getThis().name;
+		catch (Exception e) assert(false, e.msg);
+		return thname.length ? thname : "unknown";
 	}
 
 	override size_t waiterCount() { return m_waiterCount + m_timers.pendingCount; }
