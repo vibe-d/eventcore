@@ -33,7 +33,7 @@ final class LoopTimeoutTimerDriver : EventDriverTimers {
 		m_wheels.initialize(getTimeIndex(MonoTime.currTime()));
 	}
 
-	~this()
+	void dispose()
 	@nogc @trusted nothrow {
 		// TODO: remove/deallocate all timer slots!
 
@@ -42,8 +42,8 @@ final class LoopTimeoutTimerDriver : EventDriverTimers {
 			m_freeList.removeFront();
 			() @trusted {
 				scope (failure) assert(false);
-				Mallocator.instance.dispose(tm);
 				GC.removeRange(tm);
+				Mallocator.instance.dispose(tm);
 			} ();
 		}
 

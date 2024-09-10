@@ -92,6 +92,7 @@ final class WinAPIEventDriver : EventDriver {
 
 		m_events.dispose();
 		m_core.dispose();
+		m_timers.dispose();
 		assert(threadInstance !is null);
 		threadInstance = null;
 
