@@ -309,6 +309,14 @@ final class WinAPIEventDriverFiles : EventDriverFiles {
 		return false;
 	}
 
+	override bool isUnique(FileFD handle)
+	const {
+		if (!isValid(handle)) return false;
+		if (auto ps = idToHandle(handle) in m_core.m_handles)
+			return ps.refCount == 1;
+		return false;
+	}
+
 	override void addRef(FileFD descriptor)
 	{
 		if (!isValid(descriptor)) return;

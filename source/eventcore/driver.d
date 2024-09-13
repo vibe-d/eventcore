@@ -540,6 +540,9 @@ interface EventDriverFiles {
 	*/
 	bool isValid(FileFD handle) const @nogc;
 
+	/// Determines if the given file's reference count equals one.
+	bool isUnique(FileFD descriptor) const;
+
 	/** Increments the reference count of the given file.
 	*/
 	void addRef(FileFD descriptor);

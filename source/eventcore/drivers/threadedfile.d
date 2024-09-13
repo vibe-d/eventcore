@@ -417,6 +417,12 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents, Core : EventDriv
 		return m_files[handle.value].validationCounter == handle.validationCounter;
 	}
 
+	final override bool isUnique(FileFD handle)
+	const {
+		if (!isValid(handle)) return false;
+		return m_files[handle.value].refCount == 1;
+	}
+
 	final override void addRef(FileFD descriptor)
 	{
 		if (!isValid(descriptor)) return;
