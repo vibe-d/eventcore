@@ -30,7 +30,7 @@ final class WinAPIEventDriverEvents : EventDriverEvents {
 		EventSlot[EventID] m_events;
 		CRITICAL_SECTION m_mutex;
 		ConsumableQueue!Trigger m_pending;
-		uint m_idCounter;
+		static shared uint m_idCounter;
 	}
 
 	this(WinAPIEventDriverCore core)
@@ -70,8 +70,10 @@ final class WinAPIEventDriverEvents : EventDriverEvents {
 
 	override EventID create()
 	{
-		auto id = EventID(m_idCounter++, 0);
-		if (id == EventID.invalid) id = EventID(m_idCounter++, 0);
+		import core.atomic : atomicOp;
+
+		auto id = EventID(atomicOp!"+="(m_idCounter, 1), 0);
+		if (id == EventID.invalid) id = EventID(atomicOp!"+="(m_idCounter, 1), 0);
 		m_events[id] = EventSlot(1, new ConsumableQueue!EventCallback); // FIXME: avoid GC allocation
 		debug (EventCoreLeakTrace) {
 			import core.runtime : defaultTraceHandler;
