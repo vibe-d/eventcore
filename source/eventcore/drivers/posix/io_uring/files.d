@@ -254,6 +254,11 @@ final class UringDriverFiles : EventDriverFiles
 		return m_loop.isValid(handle);
 	}
 
+	final override bool isUnique(FileFD handle)
+	const {
+		return m_loop.isUnique(handle);
+	}
+
 	/** Increments the reference count of the given file.
 	*/
 	void addRef(FileFD descriptor)

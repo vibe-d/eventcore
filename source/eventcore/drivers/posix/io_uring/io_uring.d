@@ -161,6 +161,12 @@ final class UringEventLoop
 			&& m_fds[fd].validationCounter == fd.validationCounter;
 	}
 
+	bool isUnique(FD fd) const @nogc nothrow @safe
+	{
+		if (!isValid(fd)) return false;
+		return m_fds[fd].refCount == 1;
+	}
+
 	void addRef(FD fd) @nogc nothrow @safe
 	{
 		if (!isValid(fd))
