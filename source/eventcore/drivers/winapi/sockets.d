@@ -635,7 +635,7 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 				ipv6_mreq mreq;
 				mreq.ipv6mr_multiaddr = addr.sin6_addr;
 				mreq.ipv6mr_interface = htonl(interface_index);
-				return () @trusted { return setsockopt(cast(SOCKET)socket, IPPROTO_IP, IPV6_JOIN_GROUP, &mreq, ipv6_mreq.sizeof); } () == 0;
+				return () @trusted { return setsockopt(cast(SOCKET)socket, IPPROTO_IPV6, IPV6_JOIN_GROUP, &mreq, ipv6_mreq.sizeof); } () == 0;
 		}
 	}
 
