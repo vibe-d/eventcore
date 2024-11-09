@@ -848,7 +848,7 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 				} else {
 					mreq.ipv6mr_interface = htonl(interface_index);
 				}
-				return () @trusted { return setsockopt(cast(sock_t)socket, IPPROTO_IP, IPV6_JOIN_GROUP, &mreq, ipv6_mreq.sizeof); } () == 0;
+				return () @trusted { return setsockopt(cast(sock_t)socket, IPPROTO_IPV6, IPV6_JOIN_GROUP, &mreq, ipv6_mreq.sizeof); } () == 0;
 		}
 	}
 
