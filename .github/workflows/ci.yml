@@ -16,7 +16,7 @@ jobs:
             fail-fast: false
             matrix:
                 os: [ubuntu-latest, windows-latest, macos-13]
-                dc: [dmd-latest, ldc-latest, dmd-2.086.0, ldc-1.16.0, ldc-1.17.0]
+                dc: [dmd-latest, ldc-latest, dmd-2.087.1, ldc-1.17.0]
                 arch: [x86_64]
                 config: [select, epoll, cfrunloop, winapi]
                 exclude:
@@ -26,12 +26,7 @@ jobs:
                   - {os: macos-13, config: winapi}
                   - {os: windows-latest, config: cfrunloop}
                   - {os: windows-latest, config: epoll}
-                  # macOS fails up to FE 2.086.x, so we test on a slightly newer
-                  # version instead
-                  # "dyld: lazy symbol binding failed: Symbol not found: _dyld_enumerate_tlv_storage"
-                  - {os: macos-13, dc: dmd-2.086.0}
-                  - {os: macos-13, dc: ldc-1.16.0}
-                  - {os: windows-latest, dc: ldc-1.16.0, config: select}
+                  - {os: macos-13, dc: dmd-2.087.1}
                   - {os: windows-latest, dc: ldc-1.17.0}
                   - {os: ubuntu-latest, dc: ldc-1.17.0}
                 include:

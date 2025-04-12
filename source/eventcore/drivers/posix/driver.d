@@ -385,15 +385,8 @@ package class PosixEventLoop {
 				del(FD(i, m_fds[i].common.validationCounter));
 	}
 
-	static if (__VERSION__ <= 2086) {
-		/// private
-		final void addWaiter() { m_waiterCount++; }
-		/// private
-		final void removeWaiter() { m_waiterCount--; }
-	} else {
-		package(eventcore.drivers) final void addWaiter() { m_waiterCount++; }
-		package(eventcore.drivers) final void removeWaiter() { m_waiterCount--; }
-	}
+	package(eventcore.drivers) final void addWaiter() { m_waiterCount++; }
+	package(eventcore.drivers) final void removeWaiter() { m_waiterCount--; }
 
 	package void setNotifyCallback(EventType evt)(FD fd, FDSlotCallback callback)
 	{
