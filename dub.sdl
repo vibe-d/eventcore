@@ -53,7 +53,7 @@ configuration "select" {
 
 configuration "uring" {
 	platforms "linux"
-	versions "EventcoreEpollDriver" "EventcoreEpollUsesUring"
+	versions "EventcoreUringDriver"
 }
 
 configuration "generic" {

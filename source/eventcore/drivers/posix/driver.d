@@ -46,10 +46,8 @@ version(EventcoreEpollUsesUring) {
 
 final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 @safe: /*@nogc:*/ nothrow:
-
-
 	private {
-		alias CoreDriver = PosixEventDriverCore!(Loop, TimerDriver, EventsDriver, ProcessDriver, UringCore);
+		alias CoreDriver = PosixEventDriverCore!(Loop, TimerDriver, EventsDriver, ProcessDriver);
 		alias EventsDriver = PosixEventDriverEvents!(Loop, SocketsDriver);
 		version (linux) alias SignalsDriver = SignalFDEventDriverSignals!Loop;
 		else alias SignalsDriver = DummyEventDriverSignals!Loop;
@@ -69,11 +67,8 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 		} else alias WatcherDriver = PollEventDriverWatchers!EventsDriver;
 		version (Posix) alias ProcessDriver = PosixEventDriverProcesses!Loop;
 		else alias ProcessDriver = DummyEventDriverProcesses!Loop;
-		version (EventcoreEpollUsesUring) alias UringCore = UringEventLoop;
-		else alias UringCore = NoRing;
 
 		Loop m_loop;
-		UringCore m_uring;
 		CoreDriver m_core;
 		EventsDriver m_events;
 		SignalsDriver m_signals;
@@ -89,14 +84,15 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 	this()
 	@nogc @trusted {
 		m_loop = mallocT!Loop;
-		m_uring = mallocT!UringCore;
+		version (EventcoreEpollUsesUring)
+			m_uring = mallocT!UringCore;
 		m_sockets = mallocT!SocketsDriver(m_loop);
 		m_events = mallocT!EventsDriver(m_loop, m_sockets);
 		m_signals = mallocT!SignalsDriver(m_loop);
 		m_timers = mallocT!TimerDriver;
 		m_pipes = mallocT!PipeDriver(m_loop);
 		m_processes = mallocT!ProcessDriver(m_loop, this);
-		m_core = mallocT!CoreDriver(m_loop, m_timers, m_events, m_processes, m_uring);
+		m_core = mallocT!CoreDriver(m_loop, m_timers, m_events, m_processes);
 		m_dns = mallocT!DNSDriver(m_events, m_signals);
 		version (EventcoreEpollUsesUring) m_files = mallocT!FileDriver(m_uring);
 		else m_files = mallocT!FileDriver(m_events, m_core);
@@ -187,7 +183,7 @@ final class PosixEventDriver(Loop : PosixEventLoop) : EventDriver {
 }
 
 
-final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTimers, Events : EventDriverEvents, Processes : EventDriverProcesses, Uring)
+final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTimers, Events : EventDriverEvents, Processes : EventDriverProcesses)
 	: EventDriverCore {
 @safe nothrow:
 	import core.atomic : atomicLoad, atomicStore;
@@ -205,7 +201,6 @@ final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTime
 		Timers m_timers;
 		Events m_events;
 		Processes m_processes;
-		Uring m_uring;
 		bool m_exit = false;
 		EventID m_wakeupEvent;
 
@@ -213,8 +208,7 @@ final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTime
 		ConsumableQueue!ThreadCallbackEntry m_threadCallbacks;
 	}
 
-	this(Loop loop, Timers timers, Events events, Processes processes,
-		Uring uring)
+	this(Loop loop, Timers timers, Events events, Processes processes)
 	@nogc {
 		m_loop = loop;
 		m_timers = timers;
@@ -224,8 +218,7 @@ final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTime
         m_threadCallbackMutex = mallocT!(shared(Mutex));
 		m_threadCallbacks = mallocT!(ConsumableQueue!ThreadCallbackEntry);
 		m_threadCallbacks.reserve(1000);
-		m_uring = uring;
-		m_uring.registerEventID(m_wakeupEvent);
+//		m_loop.registerEventID(m_wakeupEvent);
 	}
 
 	final void dispose()
@@ -240,7 +233,7 @@ final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTime
 	}
 
 	@property size_t waiterCount() const {
-		return m_loop.m_waiterCount + m_timers.pendingCount + m_processes.pendingCount + m_uring.waiterCount;
+		return m_loop.m_waiterCount + m_timers.pendingCount + m_processes.pendingCount;
 	}
 
 	@property Loop loop() { return m_loop; }
@@ -258,12 +251,6 @@ final class PosixEventDriverCore(Loop : PosixEventLoop, Timers : EventDriverTime
 
 		if (!waiterCount) {
 			return ExitReason.outOfWaiters;
-		}
-		version (EventcoreEpollUsesUring) {
-			// this is required to make the kernel aware of
-			// submitted SEQ, otherwise the first call to
-			// process events could stall
-			m_uring.submit;
 		}
 		bool got_events;
 		if (timeout <= 0.seconds) {
@@ -411,8 +398,8 @@ package class PosixEventLoop {
 				del(FD(i, m_fds[i].common.validationCounter));
 	}
 
-	package(eventcore.drivers) final void addWaiter() { m_waiterCount++; }
-	package(eventcore.drivers) final void removeWaiter() { m_waiterCount--; }
+	package(eventcore.drivers) final void addWaiter() @nogc { m_waiterCount++; }
+	package(eventcore.drivers) final void removeWaiter() @nogc { m_waiterCount--; }
 
 	package void setNotifyCallback(EventType evt)(FD fd, FDSlotCallback callback)
 	{

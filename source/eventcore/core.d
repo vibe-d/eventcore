@@ -6,11 +6,13 @@ import eventcore.drivers.posix.cfrunloop;
 import eventcore.drivers.posix.epoll;
 import eventcore.drivers.posix.kqueue;
 import eventcore.drivers.posix.select;
+import eventcore.drivers.posix.io_uring.io_uring;
 import eventcore.drivers.libasync;
 import eventcore.drivers.winapi.driver;
 import eventcore.internal.utils : mallocT, freeT;
 
 version (EventcoreEpollDriver) alias NativeEventDriver = EpollEventDriver;
+else version (EventcoreUringDriver) alias NativeEventDriver = UringEventDriver;
 else version (EventcoreCFRunLoopDriver) alias NativeEventDriver = CFRunLoopEventDriver;
 else version (EventcoreKqueueDriver) alias NativeEventDriver = KqueueEventDriver;
 else version (EventcoreWinAPIDriver) alias NativeEventDriver = WinAPIEventDriver;

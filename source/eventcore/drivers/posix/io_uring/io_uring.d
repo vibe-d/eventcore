@@ -42,20 +42,11 @@
 module eventcore.drivers.posix.io_uring.io_uring;
 
 import eventcore.driver;
+import eventcore.drivers.posix.driver;
+import eventcore.drivers.posix.epoll;
 import eventcore.internal.utils;
 
 import core.time : Duration;
-
-
-/// substitue for UringCore that does nothing for
-/// non-uring posix event loops
-final class NoRing
-{
-	void registerEventID(EventID id) nothrow @trusted @nogc { }
-	void submit() nothrow @trusted @nogc { }
-	@property size_t waiterCount() const nothrow @safe { return 0; }
-	bool doProcessEvents(Duration timeout, bool dontWait = true) nothrow @trusted { return false; }
-}
 
 
 version (linux):
@@ -63,6 +54,10 @@ version (linux):
 import during;
 import std.stdio;
 static import std.typecons;
+
+
+alias UringEventDriver = PosixEventDriver!UringEventLoop;
+
 
 /// eventcore allows exactly one simultaneous operation per kind per
 /// descriptor.
@@ -125,16 +120,15 @@ private struct UserData
 
 
 ///
-final class UringEventLoop
+final class UringEventLoop : EpollEventLoop
 {
 	import eventcore.internal.consumablequeue;
 	import std.typecons : Tuple, tuple;
 
 	private {
 		Uring m_io;
-		ChoppedVector!(ResourceData) m_fds;
+		ChoppedVector!(ResourceData) m_uringFDs;
 		ChoppedVector!(OpData) m_ops;
-		int m_runningOps;
 	}
 
 	nothrow @nogc
@@ -155,31 +149,31 @@ final class UringEventLoop
 		m_io.registerEventFD(cast(int) id);
 	}
 
-	bool isValid(FD fd) const @nogc nothrow @safe
+	bool uringIsValid(FD fd) const @nogc nothrow @safe
 	{
-		return fd.value < m_fds.length
-			&& m_fds[fd].validationCounter == fd.validationCounter;
+		return fd.value < m_uringFDs.length
+			&& m_uringFDs[fd].validationCounter == fd.validationCounter;
 	}
 
-	bool isUnique(FD fd) const @nogc nothrow @safe
+	bool uringIsUnique(FD fd) const @nogc nothrow @safe
 	{
-		if (!isValid(fd)) return false;
-		return m_fds[fd].refCount == 1;
+		if (!uringIsValid(fd)) return false;
+		return m_uringFDs[fd].refCount == 1;
 	}
 
-	void addRef(FD fd) @nogc nothrow @safe
+	void uringAddRef(FD fd) @nogc nothrow @safe
 	{
-		if (!isValid(fd))
+		if (!uringIsValid(fd))
 			return;
-		m_fds[fd].refCount += 1;
+		m_uringFDs[fd].refCount += 1;
 	}
 
-	bool releaseRef(FD fd) @nogc nothrow @trusted
+	bool uringReleaseRef(FD fd) @nogc nothrow @trusted
 	{
-		if (!isValid(fd))
+		if (!uringIsValid(fd))
 			return true;
 
-		ResourceData* fds = &m_fds[fd];
+		ResourceData* fds = &m_uringFDs[fd];
 		fds.refCount -= 1;
 		if (fds.refCount == 0)
 		{
@@ -200,13 +194,21 @@ final class UringEventLoop
 		m_io.submit(0);
 	}
 
-	bool doProcessEvents(Duration timeout, bool dontWait = true) nothrow @trusted
+	override bool doProcessEvents(Duration timeout)
+	nothrow @trusted
 	{
 		import std.algorithm : max;
 		import std.typecons : TypedefType;
 
+		// this is required to make the kernel aware of
+		// submitted SEQ, otherwise the first call to
+		// process events could stall
+		submit();
+
+		auto epevts = super.doProcessEvents(timeout);
+
 		// we add a timeout so that we do not wait indef.
-		if (!dontWait && timeout != Duration.max)
+		/*if (!dontWait && timeout != Duration.max)
 		{
 			KernelTimespec timespec;
 			timeout.split!("seconds", "nsecs")(timespec.tv_sec, timespec.tv_nsec);
@@ -216,13 +218,13 @@ final class UringEventLoop
 				e.prepTimeout(timespec, 1);
 				e.user_data = ulong.max;
 			})(timespec);
-		}
-		int res = m_io.submit(dontWait ? 0 : 1);
+		}*/
+		int res = m_io.submit(/*dontWait ?*/ 0/* : 1*/);
 		if (res < 0)
 		{
-			return false;
+			return epevts;
 		}
-		bool gotEvents = !m_io.empty;
+		bool gotEvents = !m_io.empty || epevts;
 		foreach (ref CompletionEntry e; m_io)
 		{
 			import eventcore.internal.utils : print;
@@ -235,15 +237,15 @@ final class UringEventLoop
 			// let the specific driver handle the rest
 			splitKey(e.user_data, opIdx, type);
 			OpData* op = &m_ops[cast(TypedefType!OpIdx) opIdx];
-			assert (op.fd == FD.init || isValid(op.fd));
+			assert (op.fd == FD.init || uringIsValid(op.fd));
 			// cb might be null, if the operation was cancelled
 			if (op.opCb)
 			{
 				print("reset op: %s", opIdx);
-				// e.g. open sets m_fds to FD.init
+				// e.g. open sets m_uringFDs to FD.init
 				if (op.fd != FD.init)
-					m_fds[op.fd].runningOps[type] = OpIdx.init;
-				m_runningOps -= 1;
+					m_uringFDs[op.fd].runningOps[type] = OpIdx.init;
+				removeWaiter();
 				op.opCb(op.fd, e, op.userCb);
 				*op = OpData.init;
 			}
@@ -251,36 +253,34 @@ final class UringEventLoop
 		return gotEvents;
 	}
 
-	void resetFD(ref ResourceData data) nothrow @nogc
+	void uringResetFD(ref ResourceData data) nothrow @nogc
 	{
 		int vc = data.validationCounter;
 		data = ResourceData.init;
 		data.validationCounter = vc + 1;
 	}
 
-	@property size_t waiterCount() const nothrow @safe { return m_runningOps; }
-
-	package FDType initFD(FDType)(size_t fd)
+	package FDType uringInitFD(FDType)(size_t fd)
 	{
-		auto slot = &m_fds[fd];
+		auto slot = &m_uringFDs[fd];
 		assert (slot.refCount == 0, "Initializing referenced file descriptor slot.");
 		assert (slot.descriptor == -1, "Initializing referenced file descriptor slot.");
 		slot.refCount = 1;
 		return FDType(fd, slot.validationCounter);
 	}
 
-	package void put(in FD fd, in EventType type, SubmissionEntry e,
+	package void uringPut(in FD fd, in EventType type, SubmissionEntry e,
 		OpCallback cb, UserCallback userCb) @safe nothrow
 	{
 		import std.typecons : TypedefType;
-		m_runningOps += 1;
+		addWaiter();
 		OpIdx idx = allocOpData();
 		ulong userData = combineKey(idx, type);
 		e.user_data = userData;
 		m_io.put(e);
 		if (fd != FD.init)
 		{
-			ResourceData* res = &m_fds[fd.value];
+			ResourceData* res = &m_uringFDs[fd.value];
 			assert (res.runningOps[type] == OpIdx.init);
 			res.runningOps[type] = idx;
 		}
@@ -289,10 +289,10 @@ final class UringEventLoop
 
 	void cancelOp(FD fd, EventType type) @safe nothrow @nogc
 	{
-		if (!isValid(fd))
+		if (!uringIsValid(fd))
 			return;
 
-		OpIdx idx = m_fds[fd].runningOps[type];
+		OpIdx idx = m_uringFDs[fd].runningOps[type];
 		if (idx != OpIdx.init)
 			cancelOp(idx, type);
 	}
@@ -303,17 +303,17 @@ final class UringEventLoop
 		OpData* opData = &m_ops[cast(TypedefType!OpIdx)opIdx];
 		if (opData.fd != FD.init)
 		{
-			if (!isValid(opData.fd))
+			if (!uringIsValid(opData.fd))
 			{
 				print("cancel for invalid fd");
 				return;
 			}
-			if (m_fds[opData.fd].runningOps[type] == OpIdx.init)
+			if (m_uringFDs[opData.fd].runningOps[type] == OpIdx.init)
 			{
 				print("cancelling op that's not running");
 				return;
 			}
-			m_fds[opData.fd].runningOps[type] = OpIdx.init;
+			m_uringFDs[opData.fd].runningOps[type] = OpIdx.init;
 		}
 		print("cancel op: %s", opIdx);
 		ulong op = combineKey(opIdx, type);
@@ -323,16 +323,16 @@ final class UringEventLoop
 			prepCancel(e, op);
 			e.user_data = ulong.max;
 		})(op);
-		m_runningOps -= 1;
+		removeWaiter();
 	}
 
-	package void* rawUserData(FD descriptor, size_t size, DataInitializer initialize, DataInitializer destroy)
+	package void* uringRawUserData(FD descriptor, size_t size, DataInitializer initialize, DataInitializer destroy)
 		nothrow @system
 	{
 		return null;
 	}
 
-	package final void* rawUserDataImpl(size_t descriptor, size_t size, DataInitializer initialize, DataInitializer destroy)
+	package final void* uringRawUserDataImpl(size_t descriptor, size_t size, DataInitializer initialize, DataInitializer destroy)
 	@system @nogc nothrow
 	{
 		return null;

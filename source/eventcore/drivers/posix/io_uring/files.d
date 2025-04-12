@@ -68,7 +68,7 @@ final class UringDriverFiles : EventDriverFiles
 
 		SubmissionEntry e;
 		prepOpenat(e, AT_FDCWD, path.toStringz, flags, amode);
-		m_loop.put(FD.init, EventType.status, e, &handleOpen, () @trusted { return cast(UserCallback)userCb; } ());
+		m_loop.uringPut(FD.init, EventType.status, e, &handleOpen, () @trusted { return cast(UserCallback)userCb; } ());
 	}
 
 	private void handleOpen(FD fd, ref const(CompletionEntry) e, UserCallback userCb)
@@ -100,7 +100,7 @@ final class UringDriverFiles : EventDriverFiles
 	{
 		auto flags = () @trusted { return fcntl(system_file_handle, F_GETFD); } ();
 		if (flags == -1) return FileFD.invalid;
-		return  () @trusted { return m_loop.initFD!FileFD(system_file_handle); }();
+		return  () @trusted { return m_loop.uringInitFD!FileFD(system_file_handle); }();
 	}
 
 	/** Disallows any reads/writes and removes any exclusive locks.
@@ -117,7 +117,7 @@ final class UringDriverFiles : EventDriverFiles
 		}
 		SubmissionEntry e;
 		e.prepClose(cast(int) file);
-		m_loop.put(cast(FD) file, EventType.status, e, &handleClose,
+		m_loop.uringPut(cast(FD) file, EventType.status, e, &handleClose,
 			cast(UserCallback) onClosed);
 	}
 
@@ -182,7 +182,7 @@ final class UringDriverFiles : EventDriverFiles
 
 		SubmissionEntry e;
 		e.prepWrite(cast(int) file, buffer, offset);
-		m_loop.put(file, EventType.write, e, &handleIO,
+		m_loop.uringPut(file, EventType.write, e, &handleIO,
 			cast(UserCallback) on_write_finish);
 	}
 
@@ -225,7 +225,7 @@ final class UringDriverFiles : EventDriverFiles
 		}
 		SubmissionEntry e;
 		e.prepRead(cast(int) file, buffer, offset);
-		m_loop.put(file, EventType.read, e, &handleIO,
+		m_loop.uringPut(file, EventType.read, e, &handleIO,
 			cast(UserCallback) on_read_finish);
 	}
 
@@ -251,19 +251,19 @@ final class UringDriverFiles : EventDriverFiles
 	*/
 	bool isValid(FileFD handle) const @nogc
 	{
-		return m_loop.isValid(handle);
+		return m_loop.uringIsValid(handle);
 	}
 
 	final override bool isUnique(FileFD handle)
 	const {
-		return m_loop.isUnique(handle);
+		return m_loop.uringIsUnique(handle);
 	}
 
 	/** Increments the reference count of the given file.
 	*/
 	void addRef(FileFD descriptor)
 	{
-		m_loop.addRef(descriptor);
+		m_loop.uringAddRef(descriptor);
 	}
 
 	/** Decrements the reference count of the given file.
@@ -278,7 +278,7 @@ final class UringDriverFiles : EventDriverFiles
 	*/
 	bool releaseRef(FileFD descriptor)
 	{
-		return m_loop.releaseRef(descriptor);
+		return m_loop.uringReleaseRef(descriptor);
 	}
 
 	/** Retrieves a reference to a user-defined value associated with a descriptor.
@@ -294,7 +294,7 @@ final class UringDriverFiles : EventDriverFiles
 	/// Low-level user data access. Use `userData` instead.
 	protected void* rawUserData(FileFD descriptor, size_t size, DataInitializer initialize, DataInitializer destroy) @system nothrow
 	{
-		return m_loop.rawUserData(descriptor, size, initialize, destroy);
+		return m_loop.uringRawUserData(descriptor, size, initialize, destroy);
 	}
 
 }
