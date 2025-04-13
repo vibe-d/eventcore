@@ -15,7 +15,6 @@ import eventcore.drivers.posix.watchers;
 import eventcore.drivers.posix.processes;
 import eventcore.drivers.posix.pipes;
 import eventcore.drivers.posix.uring;
-import eventcore.drivers.posix.io_uring.files;
 import eventcore.drivers.timer;
 import eventcore.drivers.threadedfile;
 import eventcore.internal.consumablequeue : ConsumableQueue;
