@@ -22,9 +22,10 @@ WinAPIEventDriver    | &mdash; | yes     | &mdash; | &mdash; | &mdash; | &mdash;
 KqueueEventDriver    | &mdash; | &mdash; | yes     | yes¹    | &mdash; | yes
 CFRunloopEventDriver | &mdash; | &mdash; | yes     | &mdash; | &mdash; | yes
 LibasyncEventDriver  | &mdash;¹| &mdash;¹| &mdash;¹| &mdash;¹| &mdash; | &mdash;
-UringEventDriver     | &mdash;¹| no      | no      | no      | unknown | no
+UringEventDriver     | yes²    | no      | no      | no      | unknown | no
 
 ¹ planned, but not currenly implemented
+² experimental
 
 
 Supported compilers
