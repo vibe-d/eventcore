@@ -355,7 +355,7 @@ package class PosixEventLoop {
 	import core.time : Duration;
 
 	package {
-		AlgebraicChoppedVector!(FDSlot, StreamSocketSlot, StreamListenSocketSlot, DgramSocketSlot, DNSSlot, WatcherSlot, EventSlot, SignalSlot, PipeSlot) m_fds;
+		AlgebraicChoppedVector!(FDSlot, StreamSocketSlot, StreamListenSocketSlot, DgramSocketSlot, DNSSlot, WatcherSlot, EventSlot, SignalSlot, PipeSlot, UringSlot) m_fds;
 		size_t m_handleCount = 0;
 		size_t m_waiterCount = 0;
 	}

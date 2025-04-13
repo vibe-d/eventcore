@@ -48,6 +48,31 @@ import eventcore.internal.utils;
 
 import core.time : Duration;
 
+static import std.typecons;
+
+
+alias OpIdx = std.typecons.Typedef!(int, -1, "eventcore.OpIdx");
+
+// information regarding a specific resource / descriptor
+package struct UringSlot
+{
+	alias Handle = FileFD;
+
+	// from the os, file descriptor, socket etc
+	int descriptor = -1;
+	// ref count, we'll clean up internal data structures
+	// if this reaches zero
+	uint refCount;
+	// all data structures are reused and the validation
+	// counter makes sure an user cannot access a reused
+	// slot with an old handle
+	uint validationCounter;
+
+	// to track that at most one op per EventType is ongoing
+	// contains the userData field of the resp. ops
+	OpIdx[EventType.max+1] runningOps;
+}
+
 
 version (EventcoreUringDriver):
 
@@ -57,8 +82,7 @@ import core.sys.posix.sys.stat;
 import core.sys.linux.fcntl;
 import during;
 import std.stdio;
-
-static import std.typecons;
+import taggedalgebraic.taggedalgebraic;
 
 
 alias UringEventDriver = PosixEventDriver!UringEventLoop;
@@ -95,35 +119,6 @@ struct OpData
 	UserCallback userCb;
 }
 
-alias OpIdx = std.typecons.Typedef!(int, -1, "eventcore.OpIdx");
-
-// information regarding a specific resource / descriptor
-private struct ResourceData
-{
-	// from the os, file descriptor, socket etc
-	int descriptor = -1;
-	// ref count, we'll clean up internal data structures
-	// if this reaches zero
-	uint refCount;
-	// all data structures are reused and the validation
-	// counter makes sure an user cannot access a reused
-	// slot with an old handle
-	uint validationCounter;
-
-	// to track that at most one op per EventType is ongoing
-	// contains the userData field of the resp. ops
-	OpIdx[EventType.max+1] runningOps;
-}
-
-// the user can store extra information per resource
-// which is kept in a sep. array
-private struct UserData
-{
-	DataInitializer userDataDestructor;
-	ubyte[16*size_t.sizeof] userData;
-}
-
-
 ///
 final class UringEventLoop : EpollEventLoop
 {
@@ -132,8 +127,7 @@ final class UringEventLoop : EpollEventLoop
 
 	private {
 		Uring m_io;
-		ChoppedVector!(ResourceData) m_uringFDs;
-		ChoppedVector!(OpData) m_ops;
+		ChoppedVector!OpData m_ops;
 	}
 
 	nothrow @nogc
@@ -149,52 +143,12 @@ final class UringEventLoop : EpollEventLoop
 		});
 	}
 
-	void registerEventID(EventID id) nothrow @trusted @nogc
+	package void registerEventID(EventID id) nothrow @trusted @nogc
 	{
 		m_io.registerEventFD(cast(int) id);
 	}
 
-	bool uringIsValid(FD fd) const @nogc nothrow @safe
-	{
-		return fd.value < m_uringFDs.length
-			&& m_uringFDs[fd].validationCounter == fd.validationCounter;
-	}
-
-	bool uringIsUnique(FD fd) const @nogc nothrow @safe
-	{
-		if (!uringIsValid(fd)) return false;
-		return m_uringFDs[fd].refCount == 1;
-	}
-
-	void uringAddRef(FD fd) @nogc nothrow @safe
-	{
-		if (!uringIsValid(fd))
-			return;
-		m_uringFDs[fd].refCount += 1;
-	}
-
-	bool uringReleaseRef(FD fd) @nogc nothrow @trusted
-	{
-		if (!uringIsValid(fd))
-			return true;
-
-		ResourceData* fds = &m_uringFDs[fd];
-		fds.refCount -= 1;
-		if (fds.refCount == 0)
-		{
-			import std.traits : EnumMembers;
-
-			// cancel all pendings ops
-			foreach (type; EnumMembers!EventType)
-			{
-				if (fds.runningOps[type] != OpIdx.init)
-					cancelOp(fds.runningOps[type], type);
-			}
-		}
-		return fds.refCount == 0;
-	}
-
-	void submit() nothrow @trusted @nogc
+	private void submit() nothrow @trusted @nogc
 	{
 		m_io.submit(0);
 	}
@@ -242,14 +196,14 @@ final class UringEventLoop : EpollEventLoop
 			// let the specific driver handle the rest
 			splitKey(e.user_data, opIdx, type);
 			OpData* op = &m_ops[cast(TypedefType!OpIdx) opIdx];
-			assert (op.fd == FD.init || uringIsValid(op.fd));
+			assert (op.fd == FD.init || isValid(op.fd));
 			// cb might be null, if the operation was cancelled
 			if (op.opCb)
 			{
 				print("reset op: %s", opIdx);
 				// e.g. open sets m_uringFDs to FD.init
 				if (op.fd != FD.init)
-					m_uringFDs[op.fd].runningOps[type] = OpIdx.init;
+					m_fds[op.fd].specific.runningOps[type] = OpIdx.init;
 				removeWaiter();
 				op.opCb(op.fd, e, op.userCb);
 				*op = OpData.init;
@@ -258,23 +212,13 @@ final class UringEventLoop : EpollEventLoop
 		return gotEvents;
 	}
 
-	void uringResetFD(ref ResourceData data) nothrow @nogc
-	{
-		int vc = data.validationCounter;
-		data = ResourceData.init;
-		data.validationCounter = vc + 1;
+	private bool isValid(FD handle)
+	@safe @nogc nothrow {
+		if (handle.value > m_fds.length) return false;
+		return m_fds[handle.value].common.validationCounter == handle.validationCounter;
 	}
 
-	package FDType uringInitFD(FDType)(size_t fd)
-	{
-		auto slot = &m_uringFDs[fd];
-		assert (slot.refCount == 0, "Initializing referenced file descriptor slot.");
-		assert (slot.descriptor == -1, "Initializing referenced file descriptor slot.");
-		slot.refCount = 1;
-		return FDType(fd, slot.validationCounter);
-	}
-
-	package void uringPut(in FD fd, in EventType type, SubmissionEntry e,
+	private void uringPut(in FD fd, in EventType type, SubmissionEntry e,
 		OpCallback cb, UserCallback userCb) @safe nothrow
 	{
 		import std.typecons : TypedefType;
@@ -284,40 +228,40 @@ final class UringEventLoop : EpollEventLoop
 		e.user_data = userData;
 		m_io.put(e);
 		if (fd != FD.init) {
-			ResourceData* res = () @trusted { return &m_uringFDs[fd.value]; } ();
+			auto res = () @trusted { return &m_fds[fd.value].specific.get!UringSlot; } ();
 			assert (res.runningOps[type] == OpIdx.init);
 			res.runningOps[type] = idx;
 		}
 		m_ops[cast(TypedefType!OpIdx) idx] = OpData(fd, cb, userCb);
 	}
 
-	void cancelOp(FD fd, EventType type) @safe nothrow @nogc
+	private void cancelOp(FD fd, EventType type) @safe nothrow @nogc
 	{
-		if (!uringIsValid(fd))
+		if (!isValid(fd))
 			return;
 
-		OpIdx idx = m_uringFDs[fd].runningOps[type];
+		OpIdx idx = m_fds[fd].specific.runningOps[type];
 		if (idx != OpIdx.init)
 			cancelOp(idx, type);
 	}
 
-	void cancelOp(OpIdx opIdx, EventType type) @trusted nothrow @nogc
+	private void cancelOp(OpIdx opIdx, EventType type) @trusted nothrow @nogc
 	{
 		import std.typecons : TypedefType;
 		OpData* opData = &m_ops[cast(TypedefType!OpIdx)opIdx];
 		if (opData.fd != FD.init)
 		{
-			if (!uringIsValid(opData.fd))
+			if (!isValid(opData.fd))
 			{
 				print("cancel for invalid fd");
 				return;
 			}
-			if (m_uringFDs[opData.fd].runningOps[type] == OpIdx.init)
+			if (m_fds[opData.fd].specific.runningOps[type] == OpIdx.init)
 			{
 				print("cancelling op that's not running");
 				return;
 			}
-			m_uringFDs[opData.fd].runningOps[type] = OpIdx.init;
+			m_fds[opData.fd].specific.runningOps[type] = OpIdx.init;
 		}
 		print("cancel op: %s", opIdx);
 		ulong op = combineKey(opIdx, type);
@@ -330,19 +274,7 @@ final class UringEventLoop : EpollEventLoop
 		removeWaiter();
 	}
 
-	package void* uringRawUserData(FD descriptor, size_t size, DataInitializer initialize, DataInitializer destroy)
-		nothrow @system
-	{
-		return null;
-	}
-
-	package final void* uringRawUserDataImpl(size_t descriptor, size_t size, DataInitializer initialize, DataInitializer destroy)
-	@system @nogc nothrow
-	{
-		return null;
-	}
-
-	OpIdx allocOpData() @trusted nothrow @nogc
+	private OpIdx allocOpData() @trusted nothrow @nogc
 	{
 		// TODO: use a free list or sth
 		for (int i = 0; ; ++i)
@@ -471,7 +403,10 @@ final class UringDriverFiles : EventDriverFiles
 	{
 		auto flags = () @trusted { return fcntl(system_file_handle, F_GETFD); } ();
 		if (flags == -1) return FileFD.invalid;
-		return  () @trusted { return m_loop.uringInitFD!FileFD(system_file_handle); }();
+		return  () @trusted {
+			UringSlot slot;
+			return m_loop.initFD!FileFD(system_file_handle, FDFlags.none, slot);
+		}();
 	}
 
 	/** Disallows any reads/writes and removes any exclusive locks.
@@ -622,19 +557,27 @@ final class UringDriverFiles : EventDriverFiles
 	*/
 	bool isValid(FileFD handle) const @nogc
 	{
-		return m_loop.uringIsValid(handle);
+		if (handle.value > m_loop.m_fds.length) return false;
+		return m_loop.m_fds[handle.value].common.validationCounter == handle.validationCounter;
 	}
 
 	final override bool isUnique(FileFD handle)
 	const {
-		return m_loop.uringIsUnique(handle);
+		if (!isValid(handle)) return false;
+
+		auto slot = () @trusted { return &m_loop.m_fds[handle]; } ();
+		return slot.common.refCount == 1;
 	}
 
 	/** Increments the reference count of the given file.
 	*/
 	void addRef(FileFD descriptor)
 	{
-		m_loop.uringAddRef(descriptor);
+		if (!isValid(descriptor)) return;
+
+		auto slot = () @trusted { return &m_loop.m_fds[descriptor]; } ();
+		assert(slot.common.refCount > 0, "Adding reference to unreferenced socket FD.");
+		slot.common.refCount++;
 	}
 
 	/** Decrements the reference count of the given file.
@@ -649,23 +592,31 @@ final class UringDriverFiles : EventDriverFiles
 	*/
 	bool releaseRef(FileFD descriptor)
 	{
-		return m_loop.uringReleaseRef(descriptor);
+		import taggedalgebraic : hasType;
+
+		if (!isValid(descriptor)) return true;
+
+		auto slot = () @trusted { return &m_loop.m_fds[descriptor]; } ();
+		nogc_assert(slot.common.refCount > 0, "Releasing reference to unreferenced socket FD.");
+		// listening sockets have an incremented the reference count because of setNotifyCallback
+		int base_refcount = slot.specific.hasType!UringSlot ? 1 : 0;
+		if (--slot.common.refCount == base_refcount) {
+			import std.traits : EnumMembers;
+
+			// cancel all pendings ops
+			foreach (type; EnumMembers!EventType)
+			{
+				if (slot.specific.runningOps[type] != OpIdx.init)
+					m_loop.cancelOp(slot.specific.runningOps[type], type);
+			}
+			return false;
+		}
+		return true;
 	}
 
-	/** Retrieves a reference to a user-defined value associated with a descriptor.
-	*/
-	@property final ref T userData(T)(FileFD descriptor)
-	@trusted {
-		import std.conv : emplace;
-		static void init(void* ptr) @nogc { emplace(cast(T*)ptr); }
-		static void destr(void* ptr) @nogc { destroy(*cast(T*)ptr); }
-		return *cast(T*)rawUserData(descriptor, T.sizeof, &init, &destr);
+	final protected override void* rawUserData(FileFD descriptor, size_t size, DataInitializer initialize, DataInitializer destroy)
+	@system {
+		if (!isValid(descriptor)) return null;
+		return m_loop.rawUserDataImpl(descriptor, size, initialize, destroy);
 	}
-
-	/// Low-level user data access. Use `userData` instead.
-	protected void* rawUserData(FileFD descriptor, size_t size, DataInitializer initialize, DataInitializer destroy) @system nothrow
-	{
-		return m_loop.uringRawUserData(descriptor, size, initialize, destroy);
-	}
-
 }
