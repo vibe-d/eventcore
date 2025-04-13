@@ -49,7 +49,7 @@ import eventcore.internal.utils;
 import core.time : Duration;
 
 
-version (linux):
+version (EventcoreUringDriver):
 
 import during;
 import std.stdio;

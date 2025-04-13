@@ -1,6 +1,6 @@
 module eventcore.drivers.posix.io_uring.files;
 
-version (linux):
+version (EventcoreUringDriver):
 
 import eventcore.internal.utils;
 
