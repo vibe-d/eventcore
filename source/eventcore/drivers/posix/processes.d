@@ -323,7 +323,7 @@ final class PosixEventDriverProcesses(Loop : PosixEventLoop) : EventDriverProces
 	private static void lockedProcessInfo(ProcessID pid, scope void delegate(ProcessInfo*) nothrow @safe fn)
 	{
 		lockedProcessInfoPlain(cast(int)pid.value, (pi) {
-			fn(pi.validationCounter == pid.validationCounter ? pi : null);
+			fn(pi && pi.validationCounter == pid.validationCounter ? pi : null);
 		});
 	}
 
