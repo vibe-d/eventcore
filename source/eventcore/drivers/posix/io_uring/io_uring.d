@@ -278,9 +278,8 @@ final class UringEventLoop : EpollEventLoop
 		ulong userData = combineKey(idx, type);
 		e.user_data = userData;
 		m_io.put(e);
-		if (fd != FD.init)
-		{
-			ResourceData* res = &m_uringFDs[fd.value];
+		if (fd != FD.init) {
+			ResourceData* res = () @trusted { return &m_uringFDs[fd.value]; } ();
 			assert (res.runningOps[type] == OpIdx.init);
 			res.runningOps[type] = idx;
 		}
