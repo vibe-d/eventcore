@@ -31,6 +31,7 @@ jobs:
                   - {os: macos-13, dc: dmd-2.087.1}
                   - {os: windows-latest, dc: ldc-1.17.0}
                   - {os: ubuntu-latest, dc: ldc-1.17.0}
+                  - {os: ubuntu-latest, dc: dmd-2.087.1, config: uring}
                 include:
                   - {os: windows-latest, dc: ldc-latest, arch: x86, config: winapi}
                   - {os: windows-latest, dc: dmd-latest, arch: x86_mscoff, config: winapi}
