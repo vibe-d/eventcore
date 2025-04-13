@@ -5,7 +5,7 @@ version (EventcoreUringDriver):
 import eventcore.internal.utils;
 
 import eventcore.driver;
-import eventcore.drivers.posix.io_uring.io_uring;
+import eventcore.drivers.posix.uring;
 import core.stdc.errno;
 import core.sys.posix.sys.types;
 import core.sys.posix.sys.stat;

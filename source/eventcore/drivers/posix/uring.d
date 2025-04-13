@@ -39,7 +39,7 @@
 	We do this by registering an eventfd with the base loop that triggers
 	whenever new completions are available and thus wakes up the base loop.
 */
-module eventcore.drivers.posix.io_uring.io_uring;
+module eventcore.drivers.posix.uring;
 
 import eventcore.driver;
 import eventcore.drivers.posix.driver;
