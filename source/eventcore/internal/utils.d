@@ -284,9 +284,11 @@ struct ChoppedVector(T, size_t CHUNK_SIZE = 16*64*1024/nextPOT(T.sizeof)) {
 
 		while (m_chunkCount <= chunkidx) {
 			() @trusted {
+				import core.lifetime : emplace;
 				auto ptr = cast(ChunkPtr)calloc(chunkSize, T.sizeof);
 				assert(ptr !is null, "Failed to allocate chunk!");
-				// FIXME: initialize with T.init instead of 0
+				foreach(i; 0 .. chunkSize)
+					emplace(&(*ptr)[i]);
 				static if (hasIndirections!T)
 					GC.addRange(ptr, chunkSize * T.sizeof);
 				m_chunks[m_chunkCount++] = ptr;
