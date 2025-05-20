@@ -59,7 +59,7 @@ T mallocT(T, ARGS...)(ARGS args)
         enum size = __traits(classInstanceSize, T);
         T r = cast(T)malloc(size);
         static if (hasIndirections!T)
-            GC.addRange(cast(void*)r, size);
+            GC.addRange(cast(void*)r, size, typeid(T));
         return r;
     }();
 	return emplace!T(ret, args);
@@ -86,7 +86,7 @@ T[] mallocNT(T)(size_t cnt)
 
 	auto ret = (cast(T*)malloc(T.sizeof * cnt))[0 .. cnt];
 	static if (hasIndirections!T)
-		GC.addRange(cast(void*)ret, T.sizeof * cnt);
+		GC.addRange(cast(void*)ret, T.sizeof * cnt, typeid(T[]));
 	foreach (ref v; ret)
 		static if (!is(T == class))
 			emplace!T(&v);
@@ -288,7 +288,7 @@ struct ChoppedVector(T, size_t CHUNK_SIZE = 16*64*1024/nextPOT(T.sizeof)) {
 				assert(ptr !is null, "Failed to allocate chunk!");
 				// FIXME: initialize with T.init instead of 0
 				static if (hasIndirections!T)
-					GC.addRange(ptr, chunkSize * T.sizeof);
+					GC.addRange(ptr, chunkSize * T.sizeof, typeid(T[]));
 				m_chunks[m_chunkCount++] = ptr;
 			} ();
 		}
