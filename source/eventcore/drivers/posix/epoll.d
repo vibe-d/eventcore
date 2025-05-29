@@ -21,7 +21,7 @@ alias EpollEventDriver = PosixEventDriver!EpollEventLoop;
 static if (!is(typeof(SOCK_CLOEXEC)))
 	enum SOCK_CLOEXEC = 0x80000;
 
-final class EpollEventLoop : PosixEventLoop {
+class EpollEventLoop : PosixEventLoop {
 @safe nothrow:
 
 	private {
