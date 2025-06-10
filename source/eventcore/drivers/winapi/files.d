@@ -34,7 +34,7 @@ final class WinAPIEventDriverFiles : EventDriverFiles {
 		auto handle = () @trusted {
 			scope (failure) assert(false);
 			return CreateFileW(path.toUTF16z, access, shareMode, null, creation,
-				FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, null);
+				FILE_FLAG_OVERLAPPED, null);
 		} ();
 		auto errorcode = GetLastError();
 		if (handle == INVALID_HANDLE_VALUE)
@@ -82,7 +82,7 @@ final class WinAPIEventDriverFiles : EventDriverFiles {
 			HANDLE handle = () @trusted {
 				scope (failure) assert(false);
 				return CreateFileW(path.toUTF16z, access, share_mode, null, creation,
-					FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, null);
+					FILE_FLAG_OVERLAPPED, null);
 			} ();
 			DWORD errorcode = GetLastError();
 			if (handle != INVALID_HANDLE_VALUE) {
