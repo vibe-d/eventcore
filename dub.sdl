@@ -7,7 +7,7 @@ targetType "library"
 
 libs "ws2_32" "user32" platform="windows-dmd"
 
-dependency "taggedalgebraic" version=">=0.10.12 <0.12.0-0"
+dependency "taggedalgebraic" version=">=0.10.12 <2.0.0-0"
 
 configuration "epoll" {
 	platforms "linux"
