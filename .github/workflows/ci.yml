@@ -18,17 +18,20 @@ jobs:
                 os: [ubuntu-latest, windows-latest, macos-13]
                 dc: [dmd-latest, ldc-latest, dmd-2.087.1, ldc-1.17.0]
                 arch: [x86_64]
-                config: [select, epoll, cfrunloop, winapi]
+                config: [select, epoll, cfrunloop, winapi, uring]
                 exclude:
                   - {os: ubuntu-latest, config: cfrunloop}
                   - {os: ubuntu-latest, config: winapi}
                   - {os: macos-13, config: epoll}
+                  - {os: macos-13, config: uring}
                   - {os: macos-13, config: winapi}
                   - {os: windows-latest, config: cfrunloop}
                   - {os: windows-latest, config: epoll}
+                  - {os: windows-latest, config: uring}
                   - {os: macos-13, dc: dmd-2.087.1}
                   - {os: windows-latest, dc: ldc-1.17.0}
                   - {os: ubuntu-latest, dc: ldc-1.17.0}
+                  - {os: ubuntu-latest, dc: dmd-2.087.1, config: uring}
                 include:
                   - {os: windows-latest, dc: ldc-latest, arch: x86, config: winapi}
                   - {os: windows-latest, dc: dmd-latest, arch: x86_mscoff, config: winapi}
