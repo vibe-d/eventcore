@@ -471,19 +471,26 @@ log("start processing");
 			assert(false, "File slot not in initiated state when processor task is started.");
 
 		auto bytes = buffer;
+		ulong seekret;
 		version (Windows) {
-			._lseeki64(cast(int)file, offset, SEEK_SET);
+			seekret = ._lseeki64(cast(int)file, offset, SEEK_SET);
 		} else version (linux) {
-			.lseek64(cast(int)file, offset, SEEK_SET);
+			seekret = .lseek64(cast(int)file, offset, SEEK_SET);
 		} else version (OSX) {
-			.lseek64(cast(int)file, offset, SEEK_SET);
+			seekret = .lseek64(cast(int)file, offset, SEEK_SET);
 		} else {
-			.lseek(cast(int)file, offset, SEEK_SET);
+			seekret = .lseek(cast(int)file, offset, SEEK_SET);
 		}
 
 		scope (exit) {
 log("trigger event");
 			files.m_events.trigger(files.m_readyEvent, true);
+		}
+
+		if (seekret != offset) {
+			safeAtomicStore(f.ioStatus, IOStatus.error);
+			safeAtomicStore(f.bytesWritten, buffer.length - bytes.length);
+			return;
 		}
 
 		if (bytes.length == 0) safeAtomicStore(f.ioStatus, IOStatus.ok);
@@ -492,7 +499,20 @@ log("trigger event");
 			auto sz = min(bytes.length, 512*1024);
 			auto ret = () @trusted { return mixin("."~op)(cast(int)file, bytes.ptr, cast(uint)sz); } ();
 			if (ret != sz) {
-				safeAtomicStore(f.ioStatus, IOStatus.error);
+				IOStatus st;
+				switch (errno) {
+					default: st = ret < 0 ? IOStatus.error : IOStatus.readPastEOF; break;
+					case EBADF, EINVAL: st = IOStatus.invalidHandle; break;
+					case ENOSPC: st = IOStatus.noSpaceLeft; break;
+					static if (is(typeof(EOPNOTSUPP))) {
+						case EOPNOTSUPP: st = IOStatus.operationNotSupported; break;
+					}
+					case EFBIG: st = IOStatus.tooLarge; break;
+					case EIO: st = IOStatus.ioError; break;
+					case EPERM: st = IOStatus.notAllowed; break;
+				}
+
+				safeAtomicStore(f.ioStatus, st);
 log("error");
 				break;
 			}
