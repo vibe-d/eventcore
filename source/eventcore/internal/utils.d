@@ -319,11 +319,9 @@ struct AlgebraicChoppedVector(TCommon, TSpecific...)
 
 	private static string accessors()
 	{
-		import std.format : format;
 		string ret;
 		foreach (i, U; TSpecific)
-			ret ~= "@property ref TSpecific[%s] %s() nothrow @safe @nogc { return this.specific.get!(TSpecific[%s]); }\n"
-				.format(i, U.Handle.name, i);
+			ret ~= "@property ref TSpecific["~i.stringof~"] "~U.Handle.name~"() nothrow @safe @nogc { return this.specific.get!(TSpecific["~i.stringof~"]); }\n";
 		return ret;
 	}
 
