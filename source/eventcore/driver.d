@@ -1167,11 +1167,17 @@ enum IOMode {
 }
 
 enum IOStatus {
-	ok,           /// The data has been transferred normally
-	disconnected, /// The connection was closed before all data could be transterred
-	error,        /// An error occured while transferring the data
-	wouldBlock,    /// Returned for `IOMode.immediate` when no data is readily readable/writable
-	invalidHandle, /// The passed handle is not valid
+	ok,                    /// The data has been transferred normally
+	disconnected,          /// The connection was closed before all data could be transterred
+	error,                 /// An error occured while transferring the data
+	wouldBlock,            /// Returned for `IOMode.immediate` when no data is readily readable/writable
+	invalidHandle,         /// The passed handle is not valid
+	readPastEOF,           /// An attempt was made to read data past the end of the file
+	noSpaceLeft,           /// Data could not be written, because the target volume is full
+	operationNotSupported, /// The underlying file system does not support the I/O operation
+	tooLarge,              /// The size of the file written to is too large for the file system
+	ioError,               /// An error occurred while physically writing data
+	notAllowed             /// The operation failed due to insufficient permissions
 }
 
 enum DNSStatus {

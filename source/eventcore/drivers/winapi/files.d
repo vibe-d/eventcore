@@ -423,3 +423,20 @@ private static struct CloseParams {
 	CloseStatus status;
 	WinAPIEventDriverCore core;
 }
+
+private IOStatus toIOStatus(DWORD error)
+@safe pure nothrow @nogc {
+	switch (error) {
+		default: return IOStatus.error;
+		case ERROR_INVALID_HANDLE: return IOStatus.invalidHandle;
+		case ERROR_HANDLE_DISK_FULL, ERROR_DISK_FULL: return IOStatus.noSpaceLeft;
+		case ERROR_NOT_SUPPORTED: return IOStatus.operationNotSupported;
+		case ERROR_FILE_TOO_LARGE: return IOStatus.tooLarge;
+		case ERROR_READ_FAULT, ERROR_WRITE_FAULT, ERROR_NET_WRITE_FAULT: return IOStatus.ioError;
+		case ERROR_WRITE_PROTECT, ERROR_SHARING_VIOLATION, ERROR_LOCK_VIOLATION: return IOStatus.notAllowed;
+		case ERROR_HANDLE_EOF: return IOStatus.readPastEOF;
+	}
+}
+
+static if (!is(typeof(ERROR_FILE_TOO_LARGE)))
+	enum ERROR_FILE_TOO_LARGE = 223;
