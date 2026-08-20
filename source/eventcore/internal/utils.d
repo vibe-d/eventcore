@@ -178,6 +178,15 @@ struct ChoppedVector(T, size_t CHUNK_SIZE = 16*64*1024/nextPOT(T.sizeof)) {
 	import core.stdc.stdlib : calloc, free, malloc, realloc;
 
 	alias chunkSize = CHUNK_SIZE;
+	// Callgrind (libasync unread-ring, leftover load): opIndex is ~14% Ir
+	// and ~16% branches because every TCP event does `m_slots[idx]`.
+	// Shift/mask + inlined hit path; reserveChunk only on first touch.
+	enum size_t chunkShift = () {
+		size_t n = CHUNK_SIZE, s;
+		while (n > 1) { n >>= 1; s++; }
+		return s;
+	}();
+	enum size_t chunkMask = CHUNK_SIZE - 1;
 
 	private {
 		alias Chunk = T[chunkSize];
@@ -214,19 +223,30 @@ struct ChoppedVector(T, size_t CHUNK_SIZE = 16*64*1024/nextPOT(T.sizeof)) {
 
 	ref T opIndex(size_t index)
 	@nogc {
-		auto chunk = index / chunkSize;
-		auto subidx = index % chunkSize;
-		if (index >= m_length) m_length = index+1;
+		pragma(inline, true);
+		immutable chunk = index >> chunkShift;
+		immutable subidx = index & chunkMask;
+		if (index >= m_length) m_length = index + 1;
+		if (chunk < m_chunkCount) {
+			auto p = m_chunks[chunk];
+			version (LDC) {
+				import ldc.intrinsics : llvm_expect;
+				if (llvm_expect(p !is null, true))
+					return (*p)[subidx];
+			} else if (p)
+				return (*p)[subidx];
+		}
 		reserveChunk(chunk);
 		return (*m_chunks[chunk])[subidx];
 	}
 
 	ref const(T) opIndex(size_t index)
 	const @nogc {
+		pragma(inline, true);
 		static immutable T emptySlot;
 
-		auto chunk = index / chunkSize;
-		auto subidx = index % chunkSize;
+		immutable chunk = index >> chunkShift;
+		immutable subidx = index & chunkMask;
 		if (index >= m_length) return emptySlot;
 		auto c = m_chunks[chunk];
 		if (!c) return emptySlot;
@@ -289,8 +309,12 @@ struct ChoppedVector(T, size_t CHUNK_SIZE = 16*64*1024/nextPOT(T.sizeof)) {
 				assert(ptr !is null, "Failed to allocate chunk!");
 				foreach(i; 0 .. chunkSize)
 					emplace(&(*ptr)[i]);
+				// Conservative scan: typeid(T[]) describes an array
+				// *header* (ptr+length), not a packed blob of T. That
+				// dropped Slot.stream so GC collected AsyncTCPConnection
+				// while pumpWrite still used it (SIGSEGV on m_evLoop.status).
 				static if (hasIndirections!T)
-					GC.addRange(ptr, chunkSize * T.sizeof, typeid(T[]));
+					GC.addRange(ptr, chunkSize * T.sizeof);
 				m_chunks[m_chunkCount++] = ptr;
 			} ();
 		}

@@ -21,11 +21,12 @@ EpollEventDriver     | yes     | &mdash; | &mdash; | &mdash; | yes     | &mdash;
 WinAPIEventDriver    | &mdash; | yes     | &mdash; | &mdash; | &mdash; | &mdash;
 KqueueEventDriver    | &mdash; | &mdash; | yes     | yes¹    | &mdash; | yes
 CFRunloopEventDriver | &mdash; | &mdash; | yes     | &mdash; | &mdash; | yes
-LibasyncEventDriver  | &mdash;¹| &mdash;¹| &mdash;¹| &mdash;¹| &mdash; | &mdash;
+LibasyncEventDriver  | yes³    | yes³    | yes³    | yes³    | &mdash; | &mdash;
 UringEventDriver     | yes²    | no      | no      | no      | unknown | no
 
 ¹ planned, but not currenly implemented
 ² experimental
+³ optional (`dub --config=libasync`); TCP/UDP/DNS/timers/events/files/watchers. Processes, pipes, USDS and POSIX signals are not provided.
 
 
 Supported compilers
@@ -44,16 +45,16 @@ Driver development status
 
 Feature \ EventDriver | Select | Epoll | WinAPI  | Kqueue  | CFRunloop | Libasync | Uring
 ----------------------|--------|-------|---------|---------|-----------|----------|-------
-TCP Sockets           | yes    | yes   | yes     | yes     | yes       | &mdash;  | &mdash;
-UDP Sockets           | yes    | yes   | yes     | yes     | yes       | &mdash;  | &mdash;
+TCP Sockets           | yes    | yes   | yes     | yes     | yes       | yes      | &mdash;
+UDP Sockets           | yes    | yes   | yes     | yes     | yes       | yes      | &mdash;
 USDS                  | yes    | yes   | &mdash; | yes     | yes       | &mdash;  | &mdash;
-DNS                   | yes    | yes   | yes     | yes     | yes       | &mdash;  | &mdash;
-Timers                | yes    | yes   | yes     | yes     | yes       | &mdash;  | &mdash;
-Events                | yes    | yes   | yes     | yes     | yes       | &mdash;  | &mdash;
+DNS                   | yes    | yes   | yes     | yes     | yes       | yes      | &mdash;
+Timers                | yes    | yes   | yes     | yes     | yes       | yes      | &mdash;
+Events                | yes    | yes   | yes     | yes     | yes       | yes      | &mdash;
 Unix Signals          | yes²   | yes   | &mdash; | &mdash; | &mdash;   | &mdash;  | &mdash;
-Files                 | yes    | yes   | yes     | yes     | yes       | &mdash;  | yes
+Files                 | yes    | yes   | yes     | yes     | yes       | yes      | yes
 UI Integration        | yes¹   | yes¹  | yes     | yes¹    | yes¹      | &mdash;  | yes?
-File watcher          | yes²   | yes   | yes     | yes²    | yes²      | &mdash;  | &mdash;
+File watcher          | yes²   | yes   | yes     | yes²    | yes²      | yes      | &mdash;
 Pipes                 | yes    | yes   | &mdash; | yes     | yes       | &mdash;  | &mdash;
 Processes             | yes    | yes   | &mdash; | yes     | yes       | &mdash;  | &mdash;
 
