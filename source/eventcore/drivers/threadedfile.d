@@ -294,7 +294,19 @@ final class ThreadedFileEventDriver(Events : EventDriverEvents, Core : EventDriv
 			}
 
 			if (ftruncate(cast(int)file, cast(off_t)size) != 0) {
-				on_finish(file, IOStatus.error, 0);
+				IOStatus st;
+				switch (errno) {
+					default: st = IOStatus.error; break;
+					case EBADF, EINVAL: st = IOStatus.invalidHandle; break;
+					case ENOSPC: st = IOStatus.noSpaceLeft; break;
+					static if (is(typeof(EOPNOTSUPP))) {
+						case EOPNOTSUPP: st = IOStatus.operationNotSupported; break;
+					}
+					case EFBIG: st = IOStatus.tooLarge; break;
+					case EIO: st = IOStatus.ioError; break;
+					case EPERM: st = IOStatus.notAllowed; break;
+				}
+				on_finish(file, st, 0);
 				return;
 			}
 			on_finish(file, IOStatus.ok, 0);

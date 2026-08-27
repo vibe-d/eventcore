@@ -220,7 +220,14 @@ final class WinAPIEventDriverFiles : EventDriverFiles {
 		}
 
 		if (!SetEndOfFile(h)) {
-			on_finish(file, IOStatus.error, 0);
+			IOStatus st;
+			switch (GetLastError()) {
+				default: st = IOStatus.error;
+				case ERROR_DISK_FULL, ERROR_HANDLE_DISK_FULL: st = IOStatus.noSpaceLeft; break;
+				case ERROR_READ_FAULT, ERROR_WRITE_FAULT: st = IOStatus.ioError; break;
+				case ERROR_FILE_TOO_LARGE: st = IOStatus.tooLarge; break;
+			}
+			on_finish(file, st, 0);
 			return;
 		}
 
