@@ -366,6 +366,14 @@ final class PosixEventDriverProcesses(Loop : PosixEventLoop) : EventDriverProces
 			if (ret == -1) {
 				if (errno == EINTR) continue;
 
+				version (EventcoreTestProcessRace) {
+					// tests/0-process-race.d: widens the window between
+					// waitid() reporting no child processes and taking the
+					// lock, so that the test can add a new child process in it
+					import core.time : msecs;
+					Thread.sleep(500.msecs);
+				}
+
 				// No child processes are left (ECHILD). But a new one may
 				// have been added after waitid() has returned, and add() does
 				// not start another thread while this one is registered. So
