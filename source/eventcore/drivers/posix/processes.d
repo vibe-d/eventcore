@@ -24,6 +24,11 @@ final class PosixEventDriverProcesses(Loop : PosixEventLoop) : EventDriverProces
 		static shared Mutex s_mutex;
 		static __gshared ProcessInfo[int] s_processes;
 		static __gshared Thread s_waitThread;
+		// wait thread that has terminated, but has not been joined yet; the
+		// next wait thread joins it before terminating itself
+		static __gshared Thread s_finishedWaitThread;
+		// set by add(), reset whenever the wait thread looks at s_processes
+		static __gshared bool s_processAdded;
 
 		Loop m_loop;
 		// FIXME: avoid virtual funciton calls and use the final type instead
@@ -338,12 +343,16 @@ final class PosixEventDriverProcesses(Loop : PosixEventLoop) : EventDriverProces
 
 		assert(pid !in s_processes, "Process adopted twice");
 		s_processes[pid] = info;
+		s_processAdded = true;
 	}
 
 	private static void waitForProcesses()
 	@system {
+		import core.stdc.errno : errno, EINTR;
 		import core.sys.posix.sys.wait : idtype_t, WNOHANG, WNOWAIT, WEXITED, WEXITSTATUS, WIFEXITED, WTERMSIG, waitid, waitpid;
 		import core.sys.posix.signal : siginfo_t;
+
+		Thread previous;
 
 		while (true) {
 			siginfo_t dummy;
@@ -355,12 +364,22 @@ final class PosixEventDriverProcesses(Loop : PosixEventLoop) : EventDriverProces
 			}
 
 			if (ret == -1) {
-				{
-					s_mutex.lock_nothrow();
-					scope (exit) s_mutex.unlock_nothrow();
+				if (errno == EINTR) continue;
+
+				// No child processes are left (ECHILD). But a new one may
+				// have been added after waitid() has returned, and add() does
+				// not start another thread while this one is registered. So
+				// terminate only if no process has been added in the meantime.
+				s_mutex.lock_nothrow();
+				scope (exit) s_mutex.unlock_nothrow();
+				if (!s_processAdded) {
+					previous = s_finishedWaitThread;
+					s_finishedWaitThread = s_waitThread;
 					s_waitThread = null;
+					break;
 				}
-				break;
+				s_processAdded = false;
+				continue;
 			}
 
 			int[] allprocs;
@@ -369,6 +388,8 @@ final class PosixEventDriverProcesses(Loop : PosixEventLoop) : EventDriverProces
 				s_mutex.lock_nothrow();
 				scope (exit) s_mutex.unlock_nothrow();
 
+				// every process added so far is seen by the next waitid() call
+				s_processAdded = false;
 
 				() @trusted {
 					foreach (ref entry; s_processes.byKeyValue) {
@@ -386,6 +407,15 @@ final class PosixEventDriverProcesses(Loop : PosixEventLoop) : EventDriverProces
 					onProcessExitStatic(ret, exitstatus);
 				}
 			}
+		}
+
+		// Join the previous wait thread, which has most likely terminated long
+		// ago. druntime does not detach a terminated thread, so its stack
+		// would never be freed otherwise. Joining it here rather than in add()
+		// keeps the thread that spawns a process from waiting for it.
+		if (previous) {
+			try previous.join(false);
+			catch (Exception e) {} // at worst, the stack of the thread leaks
 		}
 	}
 
