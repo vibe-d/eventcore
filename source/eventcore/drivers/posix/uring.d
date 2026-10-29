@@ -370,7 +370,7 @@ final class UringDriverFiles : EventDriverFiles
 		}
 
 		SubmissionEntry e;
-		prepOpenat(e, AT_FDCWD, path.toStringz, flags, amode);
+		() @trusted { prepOpenat(e, AT_FDCWD, path.toStringz, flags, amode); } ();
 		m_loop.uringPut(FD.init, EventType.status, e, &handleOpen, () @trusted { return cast(UserCallback)userCb; } ());
 	}
 
