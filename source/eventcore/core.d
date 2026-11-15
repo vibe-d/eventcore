@@ -7,7 +7,7 @@ import eventcore.drivers.posix.epoll;
 import eventcore.drivers.posix.kqueue;
 import eventcore.drivers.posix.select;
 import eventcore.drivers.posix.uring;
-import eventcore.drivers.libasync;
+import eventcore.drivers.libasync.driver;
 import eventcore.drivers.winapi.driver;
 import eventcore.internal.utils : mallocT, freeT;
 

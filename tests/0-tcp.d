@@ -17,6 +17,7 @@ void main()
 {
 	testBasicExchange();
 	testShutdown();
+	testLeftoverBurst();
 }
 
 void testBasicExchange()
@@ -187,6 +188,72 @@ void testShutdown()
 				})(crbuf, IOMode.all);
 			})([1], IOMode.all);
 		})([1, 2, 3, 4], IOMode.all);
+	})(baddr);
+
+	ExitReason er;
+	do er = eventDriver.core.processEvents(Duration.max);
+	while (er == ExitReason.idle);
+	assert(er == ExitReason.outOfWaiters);
+	assert(s_done);
+	s_done = false;
+}
+
+void testLeftoverBurst()
+{
+	print("");
+	print("Leftover burst test:");
+	print("");
+
+	auto tm = eventDriver.timers.create();
+	eventDriver.timers.set(tm, 10000.msecs, 0.msecs);
+	eventDriver.timers.wait(tm, (tm) { assert(false, "Test hung."); });
+
+	static immutable ubyte[] pack1 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+	static immutable ubyte[] pack2 = [4, 3, 2, 1, 0];
+	ubyte[15] burst;
+	burst[0 .. 10] = pack1;
+	burst[10 .. 15] = pack2;
+
+	auto baddr = new InternetAddress(0x7F000001, 40002);
+	auto server = listenStream(baddr);
+	StreamSocket client;
+	StreamSocket incoming;
+
+	server.waitForConnections!((incoming_, addr) {
+		incoming = incoming_;
+		print("Got incoming, first read %s bytes", pack1.length);
+		incoming.read!((status, bts) {
+			print("First leftover read %s", bts);
+			assert(status == IOStatus.ok);
+			assert(bts == pack1.length);
+			assert(s_rbuf[0 .. pack1.length] == pack1);
+
+			print("Second leftover read %s bytes", pack2.length);
+			incoming.read!((status, bts) {
+				print("Second leftover read done %s", bts);
+				assert(status == IOStatus.ok);
+				assert(bts == pack2.length);
+				assert(s_rbuf[0 .. pack2.length] == pack2);
+
+				destroy(client);
+				destroy(incoming);
+				destroy(server);
+				s_done = true;
+				eventDriver.timers.stop(tm);
+			})(s_rbuf[0 .. pack2.length], IOMode.once);
+		})(s_rbuf[0 .. pack1.length], IOMode.once);
+	});
+
+	print("Connect leftover...");
+	connectStream!((sock, status) {
+		client = sock;
+		assert(status == ConnectStatus.connected);
+		print("Write burst %s bytes", burst.length);
+		client.write!((wstatus, bytes) {
+			print("Burst write done");
+			assert(wstatus == IOStatus.ok);
+			assert(bytes == burst.length);
+		})(burst[], IOMode.all);
 	})(baddr);
 
 	ExitReason er;
