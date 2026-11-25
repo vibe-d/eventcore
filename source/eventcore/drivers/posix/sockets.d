@@ -719,7 +719,8 @@ final class PosixEventDriverSockets(Loop : PosixEventLoop) : EventDriverSockets 
 		if (!isValid(socket)) return;
 
 		auto st = m_loop.m_fds[socket].streamSocket.state;
-		() @trusted { .shutdown(cast(sock_t)socket, shut_read ? shut_write ? SHUT_RDWR : SHUT_RD : shut_write ? SHUT_WR : 0); } ();
+		if (shut_read || shut_write)
+			() @trusted { .shutdown(cast(sock_t)socket, shut_read ? shut_write ? SHUT_RDWR : SHUT_RD : SHUT_WR); } ();
 		if (st == ConnectionState.passiveClose) shut_read = true;
 		if (st == ConnectionState.activeClose) shut_write = true;
 		m_loop.m_fds[socket].streamSocket.state = shut_read ? shut_write ? ConnectionState.closed : ConnectionState.passiveClose : shut_write ? ConnectionState.activeClose : ConnectionState.connected;
