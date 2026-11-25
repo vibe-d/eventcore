@@ -521,12 +521,19 @@ final class WinAPIEventDriverSockets : EventDriverSockets {
 	{
 		if (!isValid(socket)) return;
 
-		() @trusted { WSASendDisconnect(socket, null); } ();
-		with (m_sockets[socket].streamSocket) {
-			if (state == ConnectionState.passiveClose)
-				state = ConnectionState.closed;
-			else state = ConnectionState.activeClose;
-		}
+		auto st = m_sockets[socket].streamSocket.state;
+		if (shut_write) () @trusted { WSASendDisconnect(socket, null); } ();
+		if (shut_read) () @trusted { WSARecvDisconnect(socket, null); } ();
+		if (st == ConnectionState.passiveClose) shut_read = true;
+		if (st == ConnectionState.activeClose) shut_write = true;
+		m_sockets[socket].streamSocket.state =
+			shut_read
+				? shut_write
+					? ConnectionState.closed
+					: ConnectionState.passiveClose
+				: shut_write
+					? ConnectionState.activeClose
+					: ConnectionState.connected;
 	}
 
 	override void cancelRead(StreamSocketFD socket)

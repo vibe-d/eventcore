@@ -167,6 +167,7 @@ int GetAddrInfoExW(LPCWSTR pName, LPCWSTR pServiceName, DWORD dwNameSpace, GUID*
 SOCKET WSAAccept(SOCKET s, sockaddr *addr, INT* addrlen, LPCONDITIONPROC lpfnCondition, DWORD_PTR dwCallbackData);
 int WSAAsyncSelect(SOCKET s, HWND hWnd, uint wMsg, sizediff_t lEvent);
 SOCKET WSASocketW(int af, int type, int protocol, WSAPROTOCOL_INFOW *lpProtocolInfo, uint g, DWORD dwFlags);
+int WSARecvDisconnect(SOCKET s, WSABUF* lpInboundDisconnectData);
 int WSASendDisconnect(SOCKET s, WSABUF* lpOutboundDisconnectData);
 INT WSAStringToAddressA(const(LPSTR) AddressString, INT AddressFamily, const(WSAPROTOCOL_INFO)* lpProtocolInfo, SOCKADDR* lpAddress, INT* lpAddressLength);
 INT WSAStringToAddressW(const(LPWSTR) AddressString, INT AddressFamily, const(WSAPROTOCOL_INFOW)* lpProtocolInfo, SOCKADDR* lpAddress, INT* lpAddressLength);
