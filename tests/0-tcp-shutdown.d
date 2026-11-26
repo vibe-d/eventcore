@@ -154,17 +154,17 @@ void shutReadClient()
 	assert(s_client.state == ConnectionState.passiveClose,
 		"shutdown(read=true, write=false) should result in ConnectionState.passiveClose.");
 
-	s_client.write!((status, bytes) {
-		assert(status == IOStatus.ok, "Writes must still work after shutdown(read).");
-		assert(bytes == data_a.length);
+	s_client.read!((rstatus, rbytes) {
+		assert(rstatus == IOStatus.disconnected, "Reads must report end-of-stream after shutdown(read).");
+		assert(rbytes == 0);
+		assert(s_client.state == ConnectionState.passiveClose);
 
-		s_client.read!((rstatus, rbytes) {
-			assert(rstatus == IOStatus.disconnected, "Reads must report end-of-stream after shutdown(read).");
-			assert(rbytes == 0);
-			assert(s_client.state == ConnectionState.passiveClose);
+		s_client.write!((status, bytes) {
+			assert(status == IOStatus.ok, "Writes must still work after shutdown(read).");
+			assert(bytes == data_a.length);
 			endpointDone(false);
-		})(s_cli_buf, IOMode.all);
-	})(data_a, IOMode.all);
+		})(data_a, IOMode.all);
+	})(s_cli_buf, IOMode.all);
 }
 
 
