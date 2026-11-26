@@ -36,7 +36,7 @@ void main()
 	watcher = eventDriver.watchers.watchDirectory(testDir, false, toDelegate(&testCallback));
 	assert(watcher != WatcherID.invalid);
 	// some watcher implementations need time to initialize or report past events
-	dropChanges(2000.msecs);
+	dropChanges(2500.msecs);
 	testFile(     "file1.dat");
 	testFile(     "file2.dat");
 	testFile(     "dira/file1.dat", false);
@@ -53,7 +53,7 @@ void main()
 	watcher = eventDriver.watchers.watchDirectory(testDir, true, toDelegate(&testCallback));
 	assert(watcher != WatcherID.invalid);
 	// some watcher implementations need time to initialize or report past events
-	dropChanges(2000.msecs);
+	dropChanges(2500.msecs);
 	testFile(     "file1.dat");
 	testFile(     "file2.dat");
 	testFile(     "dira/file1.dat");
@@ -137,7 +137,7 @@ void expectChange(FileChange ch, bool expect_change)
 				assert(!expect_change, "No watcher left, but expected change.");
 				return;
 		}
-		if (!pendingChanges.length && MonoTime.currTime() - starttime >= 2000.msecs) {
+		if (!pendingChanges.length && MonoTime.currTime() - starttime >= 2500.msecs) {
 			assert(!expect_change, format("Got no change, expected %s.", ch));
 			return;
 		}

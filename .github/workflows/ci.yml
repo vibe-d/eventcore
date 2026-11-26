@@ -16,16 +16,16 @@ jobs:
             fail-fast: false
             matrix:
                 os: [ubuntu-latest, windows-latest]
-                dc: [dmd-latest, ldc-latest, dmd-2.087.1, ldc-1.17.0]
+                dc: [dmd-latest, ldc-latest, dmd-2.091.1, ldc-1.20.0]
                 arch: [x86_64]
                 config: [select, epoll, winapi, uring]
                 exclude:
                   - {os: ubuntu-latest, config: winapi}
                   - {os: windows-latest, config: epoll}
                   - {os: windows-latest, config: uring}
-                  - {os: windows-latest, dc: ldc-1.17.0}
-                  - {os: ubuntu-latest, dc: ldc-1.17.0}
-                  - {os: ubuntu-latest, dc: dmd-2.087.1, config: uring}
+                  - {os: windows-latest, dc: ldc-1.20.0}
+                  - {os: ubuntu-latest, dc: ldc-1.20.0}
+                  - {os: ubuntu-latest, dc: dmd-2.091.1, config: uring}
                 include:
                   - {os: macos-latest, dc: ldc-latest, arch: aarch64, config: cfrunloop}
                   - {os: macos-latest, dc: ldc-latest, arch: aarch64, config: kqueue}
